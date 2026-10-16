@@ -1647,6 +1647,31 @@ def sympathie_html():
         '<div class="raster3">' + "".join(teile) + "</div>"
 
 
+# ---- ggplot-Grafiken (skripte/live_grafiken.R): als Bild (hell/dunkel) einbetten, sonst die in Python gezeichnete Fassung ----
+GG_ORDNER = "data/live/grafiken"
+def gg_aktualisieren():
+    """startet skripte/live_grafiken.R, wenn eine Eingabe neuer ist als die Ausgabe"""
+    ein = [p for p in ("umfragen/umfragen_israel_palaestina.csv", "laender/laender_metadaten.csv", "skripte/live_grafiken.R") if os.path.exists(p)]
+    aus = os.path.join(GG_ORDNER, "pew_israel_hell.svg")
+    try:
+        if not os.path.exists(aus) or max(os.path.getmtime(p) for p in ein) > os.path.getmtime(aus):
+            subprocess.run(["nice", "-n", "10", "Rscript", "skripte/live_grafiken.R"], timeout=240, capture_output=True)
+    except Exception:
+        pass
+def gg_grafik(name, alt, fallback):
+    import base64
+    teile = []
+    try:
+        for modus in ("hell", "dunkel"):
+            with open(os.path.join(GG_ORDNER, f"{name}_{modus}.svg"), "rb") as fh:
+                b = base64.b64encode(fh.read()).decode()
+            teile.append(f'<div class="gg gg-{modus}"><img src="data:image/svg+xml;base64,{b}" alt="{html.escape(alt)}"></div>')
+    except Exception:
+        return fallback()
+    return "".join(teile)
+
+gg_aktualisieren()
+
 def pew_html():
     if not pew:
         return '<p class="leer">no survey data</p>'
@@ -2084,7 +2109,10 @@ body.hat-gross #gross-hinter {{ display:block; }} body.hat-gross {{ overflow:hid
 .chart .zell-d {{ fill:#0b0b0b; font-size:11px; font-variant-numeric:tabular-nums; }}
 .chart .zell-h {{ fill:#ffffff; font-size:11px; font-variant-numeric:tabular-nums; }}
 .chart g[data-tip]:hover .bar, .chart g[data-tip]:hover rect[fill] {{ opacity:.8; }}
-.chart .s0 {{ fill:var(--s0); stroke:var(--karte); stroke-width:2; }} .chart .s1 {{ fill:var(--s1); stroke:var(--karte); stroke-width:2; }}
+.chart .s0 {{ fill:var(--s0); stroke:var(--karte); stroke-width:2; }}
+.gg img {{ width:100%; height:auto; display:block; }} .gg-dunkel {{ display:none; }}
+@media (prefers-color-scheme: dark) {{ :root:not([data-theme="light"]) .gg-hell {{ display:none; }} :root:not([data-theme="light"]) .gg-dunkel {{ display:block; }} }}
+:root[data-theme="dark"] .gg-hell {{ display:none; }} :root[data-theme="dark"] .gg-dunkel {{ display:block; }} .chart .s1 {{ fill:var(--s1); stroke:var(--karte); stroke-width:2; }}
 .legende svg .s0 {{ fill:var(--s0); }} .legende svg .s1 {{ fill:var(--s1); }}
 .chart .punktlab {{ fill:var(--text2); font-size:11px; }} .chart .dendro {{ fill:none; stroke:var(--text2); stroke-width:1.5; }}
 .chart .ki {{ stroke:var(--s0); stroke-width:2; stroke-linecap:round; }}
@@ -2231,8 +2259,8 @@ Survey 2010); click an outlet for the reasoning and evidence.</p>
 (spring 2025 and 2026), values from the published tables (umfragen/umfragen_israel_palaestina.csv, with the source of each row).
 Only countries covered by the institutes.</p>
 <div class="raster">
-<section><h2>Sympathy: Israeli vs. Palestinian side (YouGov)</h2><p>“In the conflict between Israel and the Palestinians, which side do you sympathise with more?” Share in %; “both equally” and “don’t know” not shown.</p>{sympathie_html()}</section>
-<section><h2>Unfavourable view of Israel (Pew)</h2><p>Share “somewhat” or “very unfavourable”, spring 2025 and 2026. Lines connect the two waves, grouped by direction; labels show the change in percentage points (pp) and relative to 2025 (%).</p>{pew_html()}</section>
+<section><h2>Sympathy: Israeli vs. Palestinian side (YouGov)</h2><p>“In the conflict between Israel and the Palestinians, which side do you sympathise with more?” Share in %; “both equally” and “don’t know” not shown.</p>{gg_grafik('yougov_sympathie', 'YouGov: sympathy with the Palestinian minus the Israeli side, by UN subregion', sympathie_html)}</section>
+<section><h2>Unfavourable view of Israel (Pew)</h2><p>Share “somewhat” or “very unfavourable”, spring 2025 and 2026. Lines connect the two waves, grouped by direction; labels show the change in percentage points (pp) and relative to 2025 (%).</p>{gg_grafik('pew_israel', 'Pew: unfavourable view of Israel, spring 2025 and 2026, by change and continent', pew_html)}</section>
 </div>
 <section><h2>Media vs. public opinion</h2><p>Each country is a dot: survey value (x) against the media indicator (y) from that country’s articles ±{FENSTER} days around the fieldwork
 (at least 20 translated/English articles). Few countries, so exploratory only; r = Pearson correlation.</p>
