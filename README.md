@@ -107,8 +107,8 @@ konstruierten Wochen (K). Beschreibung und Begründung in `02_pipeline.Rmd`, Abs
    ```
 4. Python-Umgebung für die Übersetzung (`~/.virtualenvs/masterarbeit`): `skripte/a2_nllb_einrichten.R` richtet sie unter Windows ein
    (Python 3.12 über uv, Standard: PyTorch mit ROCm für eine AMD-Grafikkarte; für NVIDIA vorher `Sys.setenv(MASTERARBEIT_GPU = "nvidia")`).
-   Unter Linux: `skripte/a2_nllb_einrichten.sh amd|nvidia|cpu`. Die AMD-Variante ist auf dem Entwicklungsrechner geprüft, die NVIDIA-Variante
-   (CUDA-Pakete von pytorch.org) noch nicht auf NVIDIA-Hardware; der restliche Code ist für beide gleich (PyTorch nennt auch AMD-Karten "cuda").
+   Unter Linux: `skripte/a2_nllb_einrichten.sh amd|nvidia|cpu`. Beide Varianten sind geprüft: AMD (ROCm) auf dem Entwicklungsrechner, NVIDIA
+   (CUDA-Pakete von pytorch.org) auf den GPUs des bwUniCluster (A100/H100); der restliche Code ist für beide gleich (PyTorch nennt auch AMD-Karten "cuda").
 5. Dienste einrichten (Dateien in `systemd/`; Pfade und Benutzer vorher anpassen):
    ```
    # Benutzerdienste: Scraper, Regler, Übersetzer, Dashboard, Live-Server, Endkontrolle
