@@ -783,17 +783,14 @@ klären KWIC und die Quellen-Analyse.
 ```{r woerterbuch, eval = FALSE}
 ```
 
-## Selbstverteidigung: vier Unterframes
+## Selbstverteidigung im israelischen Kontext
 
-Ein Treffer bei „Selbstverteidigung“ sagt nichts über die Haltung: Er trifft „Israel has the
-right to defend itself“ ebenso wie „This is not self-defence“. Deshalb wird jeder Satz mit
-dem Begriff einer von vier Klassen zugeordnet (erste passende Regel gilt):
-**palästinensisch** (Recht der Palästinenser auf Verteidigung), **bestreitend** („is not
-self-defence“, „goes beyond self-defence“, „under the pretext of self-defence“), **bedingt**
-(„in accordance with international law“, „proportionate“) und sonst **bejahend**. Die Muster
-sind an Stichproben geprüft und werden in Abschnitt 13.3 validiert.
+Der Frame „Selbstverteidigung“ misst nur, ob Selbstverteidigung im israelischen Kontext vorkommt,
+unabhängig von Haltung oder Kritik. Ein Satz zählt, wenn er den Begriff enthält und weder das Recht
+der Palästinenser auf Verteidigung noch einen anderen Konflikt (z. B. Ukraine) meint. Die Regeln sind
+an Stichproben geprüft und werden in Abschnitt 13.3 validiert.
 
-```{r sv-unterframes, eval = FALSE}
+```{r selbstverteidigung, eval = FALSE}
 ```
 
 
@@ -895,11 +892,10 @@ als gut); danach misst Precision/Recall, wie gut die Muster sind.
 ```{r val-quellen, eval = FALSE}
 ```
 
-## 13.3 Frames und Unterframes an Originalsätzen
+## 13.3 Frames an Originalsätzen
 
-Je Wörterbuch-Kategorie 40 Treffersätze und je Unterframe der Selbstverteidigung 40 Sätze,
-gemischt und ohne Maschinenkategorie. Codiert wird, ob der Frame zutrifft bzw. welche Klasse
-der Satz hat. Ergebnis: Präzision je Frame. Liegt sie unter etwa 0,8, wird das Wörterbuch
+Je Wörterbuch-Kategorie 40 Treffersätze (bei Selbstverteidigung nach den Satzregeln),
+gemischt und ohne Maschinenkategorie. Codiert wird, ob der Frame zutrifft. Ergebnis: Präzision je Frame. Liegt sie unter etwa 0,8, wird das Wörterbuch
 nachgeschärft.
 
 ```{r val-frames, eval = FALSE}

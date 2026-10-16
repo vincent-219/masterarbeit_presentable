@@ -92,7 +92,7 @@ konstruierten Wochen (K). Beschreibung und Begründung in `02_pipeline.Rmd`, Abs
 | `32_nachtlauf.R` | Import neuer Scraper-Ergebnisse und Übersetzung in Paketen |
 | `40_relevanz.R` | Relevanzfilter auf Englisch |
 | `50_korpus.R` | Analysekorpus aus der Datenbank |
-| `55_frames.R` | Textbausteine je Medium entfernen, Selbstverteidigung satzweise in vier Unterframes |
+| `55_frames.R` | Textbausteine je Medium entfernen, Selbstverteidigung satzweise im israelischen Kontext |
 | `60_quellen.R` | Quellenzuschreibung: Muster Englisch und Deutsch, Gesundheitsministerium-Regel |
 | `70_validierung.R` | Gütemaße |
 
@@ -169,7 +169,7 @@ konstruierten Wochen (K). Beschreibung und Begründung in `02_pipeline.Rmd`, Abs
 
 ## Offene methodische Punkte
 
-- Wörterbuch-Frames und Unterframes zur Selbstverteidigung an Originalsätzen codieren (`skripte/a5_validierung.R`, Abschnitt `val-frames`).
+- Wörterbuch-Frames (Selbstverteidigung nach den Satzregeln) an Originalsätzen codieren (`skripte/a5_validierung.R`, Abschnitt `val-frames`).
 - Wortstämme des Grobfilters von Muttersprachler:innen gegenlesen lassen, besonders für die neuen Sprachen (Arabisch, Hindi, Urdu, Serbisch/Bosnisch, Albanisch).
 - Englische Wörterbücher und Zuschreibungsmuster an Originalsätzen validieren.
 - Anzahl der Themen (K) im STM nach `searchK()` und Lektüre festlegen und begründen.

@@ -240,12 +240,10 @@ Die aktuelle Länderauswahl steht im Eintrag „Stichprobe im Überblick“ (Umf
 - **Satzregeln nach der Validierung nachgeschärft** (09.10.2026; `R/55_frames.R`, gleichlautend in
   `skripte/live_dashboard.py`; Stichprobe in `data/validierung/`): Die 450 Sätze der Frame-Stichprobe sind
   von einem Sprachmodell vorcodiert, nicht von einem Menschen – eine Teilstichprobe muss noch von Hand
-  gegengeprüft werden. Daraus abgeleitet: (1) Selbstverteidigung: Kritik daran, dass ein Text das Recht
-  *nicht* erwähnt („made no mention of Israel's right to self-defence“), zählt als bejahend; die Regeln für
-  bestreitend und bedingt sind erweitert. (2) Apartheid: Sätze über das südafrikanische Apartheidregime
-  zählen nicht, außer sie beziehen den Begriff auf Israel/Palästina. (3) „(international) humanitarian
-  law“ zählt zu Völkerrecht, nicht zu Humanitär. Ergebnis gegen die Codierung: Selbstverteidigung 113 von
-  124 Sätzen richtig klassifiziert, Apartheid 28 von 32.
+  gegengeprüft werden. Daraus abgeleitet: (1) Apartheid: Sätze über das südafrikanische Apartheidregime
+  zählen nicht, außer sie beziehen den Begriff auf Israel/Palästina. (2) „(international) humanitarian
+  law“ zählt zu Völkerrecht, nicht zu Humanitär. Ergebnis gegen die Codierung: Apartheid 28 von 32 Sätzen
+  richtig klassifiziert.
 
 - **Analysefenster: Titel und erste 1.500 Zeichen** (Design). Gemessen wird, was am Anfang eines
   Artikels steht, nicht im ganzen Text; so sind die Medien untereinander vergleichbar.
@@ -260,14 +258,14 @@ Die aktuelle Länderauswahl steht im Eintrag „Stichprobe im Überblick“ (Umf
   Frames sollen messen, was das Medium selbst setzt, nicht Standardtext. Liste der betroffenen Medien
   im Dashboard unter „Datenqualität“.
 
-- **Selbstverteidigung in vier Unterframes** (08.10.2026): Der Frame misst die Thematisierung, nicht
-  die Zustimmung. Satzweise unterschieden (Muster an Stichproben geprüft):
-  *bejahend* („Israel has the right to defend itself“), *bedingt* („… in accordance with international
-  law“, „proportionate“), *bestreitend* („this is not self-defence“, „goes beyond self-defence“,
-  „under the pretext of self-defence“), *palästinensisch* (Recht der Palästinenser auf Verteidigung).
-  Die Unterframes sind vollwertige Frames und laufen durch alle Grafiken und Modelle.
-  Muster: `SV_SATZ`, `SV_NEG`, `SV_BED`, `SV_PAL` in `skripte/live_dashboard.py`; vor der finalen
-  Analyse in `skripte/a4_analyse.R` übernehmen und an Originalsätzen validieren.
+- **Selbstverteidigung: Vorkommen im israelischen Kontext** (17.10.2026; `R/55_frames.R`, gleichlautend in
+  `skripte/live_dashboard.py`; Validierung in `skripte/a5_validierung.R`): Der Frame misst nur, ob Selbstverteidigung im
+  israelischen Kontext vorkommt, unabhängig von Haltung, Zustimmung oder Kritik. Ein Satz zählt, wenn er den Begriff
+  enthält („self-defence“, „right to defend itself“ u. ä.) und weder das Recht der Palästinenser auf Verteidigung noch einen
+  anderen Konflikt (Ukraine, Russland, Taiwan, Armenien/Aserbaidschan, Kosovo, Kurden) meint. Ein Artikel zählt einmal, wenn
+  mindestens ein Satz zählt. Begründung: Der Frame soll das Thema erfassen, nicht eine Bewertung; Haltungen würden eine
+  zusätzliche Codierung verlangen, die diese Frage nicht braucht. Die Satzregeln sind an einer Stichprobe von 40 Sätzen
+  von Hand zu prüfen (Abschnitt 13.3 in `02_pipeline.Rmd`).
 
 ## 5. Ländermerkmale und Einordnungen
 

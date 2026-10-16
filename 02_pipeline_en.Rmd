@@ -764,17 +764,14 @@ clarify what lies behind it.
 ```{r woerterbuch, eval = FALSE}
 ```
 
-## Self-defence: Four Sub-frames
+## Self-defence in the Israeli Context
 
-A match for "self-defence" says nothing about stance: it matches "Israel has the right to
-defend itself" just as well as "This is not self-defence". Each sentence containing the term
-is therefore assigned to one of four classes (first matching rule wins): **Palestinian** (the
-Palestinians' right to defend themselves), **contesting** ("is not self-defence", "goes beyond
-self-defence", "under the pretext of self-defence"), **conditional** ("in accordance with
-international law", "proportionate") and otherwise **affirming**. The patterns were checked on
-samples and are validated in section 13.3.
+The frame “Self-defence” only measures whether self-defence is raised in the Israeli context, whatever the
+stance or criticism. A sentence counts if it contains the term and refers neither to the Palestinians’
+right to defend themselves nor to another conflict (e.g. Ukraine). The rules are checked on samples and
+validated in section 13.3.
 
-```{r sv-unterframes, eval = FALSE}
+```{r selbstverteidigung, eval = FALSE}
 ```
 
 
@@ -877,11 +874,10 @@ good); precision/recall then measures how well the patterns perform.
 ```{r val-quellen, eval = FALSE}
 ```
 
-## 13.3 Frames and Sub-frames on Original Sentences
+## 13.3 Frames on Original Sentences
 
-For each dictionary category, 40 matching sentences, and for each self-defence sub-frame, 40
-sentences, shuffled and without the machine category. Coders decide whether the frame applies
-or which class the sentence belongs to. The result is precision per frame; below about 0.8 the
+For each dictionary category, 40 matching sentences (for self-defence, by the sentence rules),
+shuffled and without the machine category. Coders decide whether the frame applies. The result is precision per frame; below about 0.8 the
 dictionary is refined.
 
 ```{r val-frames, eval = FALSE}

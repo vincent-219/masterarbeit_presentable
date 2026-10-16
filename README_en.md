@@ -142,7 +142,7 @@ Description and rationale in `02_pipeline_en.Rmd`, section “Periods and Contro
 
 ## Open methodological points
 
-- Code dictionary frames and the self-defence sub-frames on original sentences (`skripte/a5_validierung.R`, section `val-frames`).
+- Code dictionary frames (self-defence by the sentence rules) on original sentences (`skripte/a5_validierung.R`, section `val-frames`).
 - Have native speakers proofread the stems of the coarse filter, especially for the new languages (Arabic, Hindi, Urdu, Serbian/Bosnian, Albanian).
 - Validate English dictionaries and attribution patterns on original sentences.
 - Fix and justify the number of topics (K) in the STM after `searchK()` and reading.

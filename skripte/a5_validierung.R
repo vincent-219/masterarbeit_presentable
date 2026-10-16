@@ -49,10 +49,9 @@ c2 <- read_csv(file.path(pfade$validierung, "quellen_codiert_2.csv"))
 kripp.alpha(rbind(c1$hand_zuschreibung, c2$hand_zuschreibung), method = "nominal")
 
 ## ---- val-frames ----
-# Wörterbuch-Frames und Unterframes zur Selbstverteidigung an Originalsätzen prüfen: je Frame 40
-# zufällige Treffer (Satz mit dem Suchbegriff) und je Unterframe 40 Sätze, gemischt und ohne
-# Maschinenkategorie exportiert. Codieren: trifft der Frame zu (1/0)? Bei Selbstverteidigung: welche
-# Klasse (bejahend, bedingt, bestreitend, palaestinensisch, keine)?
+# Wörterbuch-Frames an Originalsätzen prüfen: je Frame 40 zufällige Treffer (Satz mit dem Suchbegriff; bei
+# Selbstverteidigung nach den Satzregeln aus R/55_frames.R), gemischt und ohne Maschinenkategorie exportiert.
+# Codieren: trifft der Frame zu (1/0)?
 set.seed(3)
 frame_saetze <- map_dfr(names(diskurs_dict), \(k) {
   muster <- regex(paste0("\\b(", paste(str_replace_all(diskurs_dict[[k]], c("\\*" = "\\\\w*", " " = "\\\\s+")), collapse = "|"), ")"),
@@ -60,20 +59,19 @@ frame_saetze <- map_dfr(names(diskurs_dict), \(k) {
   tibble(id = df$id, satz = saetze(df$text_en)) |> unnest(satz) |>
     filter(str_detect(satz, muster)) |> slice_sample(n = 40) |> mutate(frame = k)
 })
-sv_stichprobe <- sv_saetze(df) |> group_by(klasse) |> slice_sample(n = 40) |> ungroup() |>
-  mutate(frame = paste0("sv_", klasse))
-val_f <- bind_rows(select(frame_saetze, id, frame, satz), select(sv_stichprobe, id, frame, satz)) |>
+sv_stichprobe <- sv_saetze(df) |> slice_sample(n = 40) |> mutate(frame = "selbstverteidigung")
+val_f <- bind_rows(select(filter(frame_saetze, frame != "selbstverteidigung"), id, frame, satz), select(sv_stichprobe, id, frame, satz)) |>
   mutate(nr = row_number()) |> slice_sample(prop = 1)
 write_csv(select(val_f, nr, id, frame, satz), file.path(pfade$validierung, "frames_maschine.csv"))
 write_csv(transmute(val_f, nr, satz,
-                    frage = if_else(str_starts(frame, "sv_"), "Klasse Selbstverteidigung?", paste0("Frame „", frame, "“ trifft zu?")),
+                    frage = paste0("Frame „", frame, "“ trifft zu?"),
                     hand = NA), file.path(pfade$validierung, "frames_zu_codieren.csv"))
 
-# Nach dem Codieren: Präzision je Frame bzw. Trefferquote je Unterframe
+# Nach dem Codieren: Präzision je Frame
 fh <- read_csv(file.path(pfade$validierung, "frames_codiert.csv"), show_col_types = FALSE)
 read_csv(file.path(pfade$validierung, "frames_maschine.csv"), show_col_types = FALSE) |>
   inner_join(select(fh, nr, hand), by = "nr") |>
-  mutate(richtig = if_else(str_starts(frame, "sv_"), hand == str_remove(frame, "^sv_"), hand %in% c(1, "1", "ja"))) |>
+  mutate(richtig = hand %in% c(1, "1", "ja")) |>
   group_by(frame) |> summarise(n = n(), praezision = mean(richtig, na.rm = TRUE))
 
 ## ---- val-uebersetzung ----

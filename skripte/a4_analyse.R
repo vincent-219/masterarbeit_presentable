@@ -58,20 +58,20 @@ hum <- tokens(corpus(humanitaer_text(df$text_en), docnames = df$id), remove_punc
 treffer[, "humanitaer"] <- as.numeric(hum[, "humanitaer"] > 0)
 treffer[, "apartheid"] <- apartheid_artikel(df)
 
-# Selbstverteidigung zusätzlich satzweise in vier Unterframes (R/55_frames.R)
-sv <- sv_unterframes(df)
+# Selbstverteidigung satzweise im israelischen Kontext (R/55_frames.R)
+treffer[, "selbstverteidigung"] <- selbstverteidigung_artikel(df)
 
 # Anteil der Artikel mit mindestens einem Treffer, je Land und Zeitraum
-frame_namen <- c(names(diskurs_dict), names(sv))
+frame_namen <- names(diskurs_dict)
 dict_anteile <- convert(treffer, to = "data.frame") |>
   as_tibble() |>
-  bind_cols(sv, as_tibble(docvars(treffer)) |> select(land, stufe, zeitraum)) |>
+  bind_cols(as_tibble(docvars(treffer)) |> select(land, stufe, zeitraum)) |>
   group_by(land, stufe, zeitraum) |>
   summarise(n = n(), across(all_of(frame_namen), ~ mean(.x > 0)), .groups = "drop")
 dict_anteile
 
-# Beispiele je Unterframe
-sv_saetze(df) |> group_by(klasse) |> slice_sample(n = 3) |> select(klasse, satz)
+# Beispielsätze zur Selbstverteidigung
+sv_saetze(df) |> slice_sample(n = 10) |> select(satz)
 
 ## ---- kwic ----
 kwic(toks, pattern = "genocid*", window = 15) |>
