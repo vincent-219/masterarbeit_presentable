@@ -33,3 +33,4 @@ scraping.log
 
 .snakemake/
 __pycache__/
+!docs/index.html
