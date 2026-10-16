@@ -150,20 +150,6 @@ Description and rationale in `02_pipeline_en.Rmd`, section “Periods and Contro
 
 Bulk translation on the bwUniCluster runs as a Snakemake workflow (export, upload, one GPU Slurm job per package, download, import; resumable). Graph and usage: [workflow/README.md](workflow/README.md); the dashboard has a "Workflow (Snakemake)" section. The continuous local translator remains for the incoming trickle of new articles.
 
-```mermaid
-flowchart TB
-    subgraph PC["Own PC (always-on services)"]
-        S["Scraper"] --> I["Import into SQLite"] --> U["Local translator (NLLB)"] --> R["Relevance, corpus, dashboard"]
-    end
-    subgraph WF["Snakemake workflow (batch)"]
-        E["Export packages"] --> H["Upload"] --> C["Slurm jobs (NLLB on H100)"] --> D["Download"] --> M["Import (nllb_hpc)"]
-    end
-    I -. open items .-> E
-    M -. translations .-> R
-```
-
-The individual rules, each with its source code:
-
 ![Gesamtablauf der Pipeline](workflow/gesamtablauf.svg)
 
 *Overall pipeline (blue: own PC, yellow: also on the cluster).*
@@ -171,6 +157,8 @@ The individual rules, each with its source code:
 ![Workflow](workflow/schaubild.svg)
 
 *Last workflow run, with state, transcript and timeline.*
+
+The individual rules of the Snakemake part (source code: [workflow/README.md](workflow/README.md#schaubild-mit-code), German):
 
 ```mermaid
 flowchart LR

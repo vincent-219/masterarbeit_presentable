@@ -177,20 +177,6 @@ konstruierten Wochen (K). Beschreibung und Begründung in `02_pipeline.Rmd`, Abs
 
 Übersetzung und Bewertung auf dem bwUniCluster laufen als Snakemake-Workflow mit Abhängigkeitsgraph, fortsetzbar und per Slurm parallel. Aufbau, Graph und Bedienung: [workflow/README.md](workflow/README.md); Zugang zum Cluster: [docs/HPC.md](docs/HPC.md).
 
-```mermaid
-flowchart TB
-    subgraph PC["Eigener PC (Dauerdienste)"]
-        S["Scraper"] --> I["Import in SQLite"] --> U["Übersetzer lokal (NLLB)"] --> R["Relevanz, Korpus, Dashboard"]
-    end
-    subgraph WF["Snakemake-Workflow (Batch)"]
-        E["Aufträge exportieren"] --> H["Hochladen"] --> C["Slurm-Jobs (NLLB auf H100)"] --> D["Herunterladen"] --> M["Import (nllb_hpc)"]
-    end
-    I -. offene Aufträge .-> E
-    M -. Übersetzungen .-> R
-```
-
-Die einzelnen Regeln, jeweils mit ihrem Quelltext:
-
 ![Gesamtablauf der Pipeline](workflow/gesamtablauf.svg)
 
 *Gesamtablauf der Pipeline (Blau: eigener PC, Gelb: auch auf dem Cluster).*
@@ -198,6 +184,8 @@ Die einzelnen Regeln, jeweils mit ihrem Quelltext:
 ![Workflow](workflow/schaubild.svg)
 
 *Letzter Lauf des Workflows, mit Zustand, Protokoll und Zeitbalken.*
+
+Die einzelnen Regeln des Snakemake-Teils (Quelltext: [workflow/README.md](workflow/README.md#schaubild-mit-code)):
 
 ```mermaid
 flowchart LR
