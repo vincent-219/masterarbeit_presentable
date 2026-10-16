@@ -30,14 +30,14 @@ Protokoll der Entscheidungen zu Stichprobe, Erhebung, Übersetzung, Messung und 
   Konfiguration und Datenbank bestehen, ohne Einfluss auf eine Analyse. Folge: Die Quellenanalyse braucht deutlich mehr
   Rechenzeit, und die Validierung der Quellenzuschreibung per Hand muss alle Länder abdecken. Die Entstehung der Auswahl steht im Unterabschnitt „Wie die Länderauswahl entstand“.
 
-- **Zugänge zu den Daten** (Stand 16.10.2026): Bei Media Cloud ist ein höheres API-Kontingent angefragt. Die Nutzung von
+- **Zugänge zu den Daten** (Stand 16.10.2026): Media Cloud hat auf Nachfrage ein höheres API-Kontingent zur Verfügung gestellt. Die Nutzung von
   Nexis Uni für den Export (nichtkommerziell, wissenschaftlich) ist mit der Universitätsbibliothek abgeklärt und bestätigt.
 
 - **Je Land eine sechste nationale Quelle ergänzt** (10.10.2026; `R/01_konfiguration.R`): Die Erhebung
   wird auf sechs nationale Medien pro Land erweitert. Die 28 Ergänzungen sind zunächst explorativ;
   ihre politische Ausrichtung bleibt bis zur Belegprüfung `unklar`, Paywall-Einstufungen sind
   vorläufig. Sitemaps werden nur innerhalb der sechs Ereignisfenster und Kontrolltage abgerufen.
-  Der frühere Befund, dass der Media-Cloud-Cache keine Treffer für die Ergänzungen habe, war wegen
+  Der frühere Befund, dass der Media-Cloud-Cache keine Treffer für die Ergänzungen haben, war wegen
   gemeinsam verwendeter Gruppencaches nicht belastbar. Eine neue, quellenbezogene Suche hat bereits
   Treffer in mehreren Ländern geliefert; URL- und Volltextzahlen werden nach Abschluss des Laufs
   aktualisiert. Lizenzpflichtige Bestände und Medien, die den Abruf nicht zulassen, kommen über den Nexis-Export
@@ -78,7 +78,7 @@ Protokoll der Entscheidungen zu Stichprobe, Erhebung, Übersetzung, Messung und 
 
 - **Medien, die automatische Abrufe sperren** (08.10.2026): Kathimerini
   (Cloudflare), TVR Info (403), Nova24TV (sperrt Kennungen mit Kontaktadresse). Die Scraper-Kennung
-  wird nicht verschleiert. Ersatz über Nexis oder Anfrage an die Sender. Ohne nutzbare Quelle: CyBC,
+  wird nicht verschleiert. Ersatz über Nexis, Anfrage an die Sender oder weglassen/ersetzen. Ohne nutzbare Quelle: CyBC,
   TVMnews (Server antworten nicht), Kıbrıs Postası (Sitemaps enden 01/2021), Nový Čas und 3Cat (keine
   Sitemap, nicht in Media Cloud).
 
@@ -87,8 +87,7 @@ Protokoll der Entscheidungen zu Stichprobe, Erhebung, Übersetzung, Messung und 
   Bei SIC Notícias (CloudFront) und SME (Cloudflare) ist die Ursache nachgeprüft: HTTP 403 auf mehrere Artikel-Adressen;
   bei den übrigen ist sie vermutet, nicht geprüft. Der Scraper verwendet keine fremden Browserkennungen und keine Proxys
   und beachtet die robots.txt. Die Medien bleiben konfiguriert; ihre Abrufquote erscheint offen im
-  Dashboard („Data quality by outlet“, Spalte Problem; „Retrieval by country“). Vorerst wird niemand angeschrieben
-  (keine Anfrage an Redaktionen oder Datenanbieter, Entscheidung 13.10.2026); weitere Wege:
+  Dashboard („Data quality by outlet“, Spalte Problem; „Retrieval by country“).  weitere Wege:
   Ersatzmedien desselben Landes oder Nexis.
 
 ### Wie die Länderauswahl entstand
@@ -101,12 +100,12 @@ Die aktuelle Länderauswahl steht im Eintrag „Stichprobe im Überblick“ (Umf
   5,41 Mio. knapp darüber). Kroatien (3,88 Mio.) und die kleineren Staaten nur im Überblick.
 
 - **Geplante Länder als Platzhalter** (13.10.2026; überholt: Die Länder sind seit dem 14. und 16.10.2026 mit Medien im Sample): Westbalkan, ehemalige Kolonien/Mandatsgebiete (u. a. Algerien,
-  Marokko, Tunesien, Libanon, Senegal, Indien, Pakistan, Nigeria, Südafrika, Brasilien, Argentinien, Angola,
+  Marokko, Tunesien, Senegal, Indien, Pakistan, Nigeria, Südafrika, Brasilien, Argentinien, Angola,
   DR Kongo), USA und Russland erscheinen auf der Karte getönt und in „Retrieval by country“ mit 0 %. Es sind noch
   **keine Medien** konfiguriert; Auswahl der Medien, Sprachen und Belege ist offen (Konzeptionsentscheidung vom
   11.10.2026: Erweiterung über Europa hinaus). Norwegen, Schweiz und Island sind konfiguriert (10 Medien).
 
-- **23 weitere Länder aufgenommen, Libanon ausgeschlossen** (14.10.2026; `R/01_konfiguration.R`,
+- **23 weitere Länder aufgenommen** (14.10.2026; `R/01_konfiguration.R`,
   `laender/laender_metadaten.csv`): 23 weitere Länder sind im Sample: Westbalkan (Serbien, Bosnien und Herzegowina, Albanien,
   Montenegro, Nordmazedonien, Kosovo), Algerien, Marokko, Tunesien, Senegal, Elfenbeinküste, Indien, Pakistan, Nigeria,
   Südafrika, Brasilien, Argentinien, Angola, Mosambik, DR Kongo, Ruanda, USA und Russland (119 Medien).
@@ -123,7 +122,7 @@ Die aktuelle Länderauswahl steht im Eintrag „Stichprobe im Überblick“ (Umf
   ausgelassen: Guancha, NHK, Kyodo News, The Philippine Star, Tasnim, New Vision). Neue Sprachen in `sprachen`: ZH, JA, KO, TH, VI, ID, BN, FA, AM, SW, MY, TL, KU, PS (NLLB-Codes).
   Auswahl der Medien nach Bekanntheit, nicht aus einem Verzeichnis; Ausrichtung "unklar".
 
-- **Iran** ist Konfliktpartei (Krieg mit Israel 2025) und wurde am 16.10.2026 wieder entfernt, wie zuvor der Libanon (14.10.2026): Land, Kürzel und die fünf Medien (IRNA, Hamshahri, Shargh, Tehran Times, Press TV) sind aus `R/01_konfiguration.R` gestrichen. Persisch (FA) bleibt wegen Afghanistan (Dari). Zu diesem Zeitpunkt gab es keine Iran-Artikel in der Datenbank.
+
 
 ## 2. Erhebung und Speicherung
 
