@@ -158,11 +158,4 @@ Bulk translation on the bwUniCluster runs as a Snakemake workflow (export, uploa
 
 *Last workflow run, with state, transcript and timeline.*
 
-The individual rules of the Snakemake part (source code: [workflow/README.md](workflow/README.md#schaubild-mit-code), German):
-
-```mermaid
-flowchart LR
-    s1["1 · export_auftraege<br/>PC"] --> s2["2 · hochladen<br/>PC"] --> s3["3 · cluster_ausfuehren<br/>PC → cluster"] --> s4["4 · uebersetzen<br/>cluster (Slurm)"] --> s5["5 · herunterladen<br/>PC"] --> s6["6 · importieren<br/>PC"] --> s7["7 · korpus<br/>PC"]
-```
-
 Source code for every step: [workflow/README.md, section "Schaubild mit Code"](workflow/README.md#schaubild-mit-code) (German).

@@ -185,11 +185,4 @@ konstruierten Wochen (K). Beschreibung und Begründung in `02_pipeline.Rmd`, Abs
 
 *Letzter Lauf des Workflows, mit Zustand, Protokoll und Zeitbalken.*
 
-Die einzelnen Regeln des Snakemake-Teils (Quelltext: [workflow/README.md](workflow/README.md#schaubild-mit-code)):
-
-```mermaid
-flowchart LR
-    s1["1 · export_auftraege<br/>PC"] --> s2["2 · hochladen<br/>PC"] --> s3["3 · cluster_ausfuehren<br/>PC → Cluster"] --> s4["4 · uebersetzen<br/>Cluster (Slurm)"] --> s5["5 · herunterladen<br/>PC"] --> s6["6 · importieren<br/>PC"] --> s7["7 · korpus<br/>PC"]
-```
-
 Quelltext zu jedem Schritt: [workflow/README.md, Abschnitt "Schaubild mit Code"](workflow/README.md#schaubild-mit-code).
