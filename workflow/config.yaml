@@ -1,0 +1,15 @@
+# Konfiguration des Snakemake-Workflows (Übersetzung und Bewertung auf dem bwUniCluster). Überschreiben: snakemake --config lauf=2026-10-20 chunk=10000
+lauf: null                 # Name des Laufs (Ordner unter data/hpc/); leer = heutiges Datum
+felder: [titel, lead, halbseite]
+chunk: 20000               # Aufträge je Paket (je Paket ein GPU-Job)
+limit: 500000              # höchstens so viele offene Aufträge je Feld exportieren
+cluster:
+  host: uc3                # Abkürzung aus ~/.ssh/config (siehe docs/HPC.md)
+  ordner: masterarbeit     # Arbeitsordner auf dem Cluster (relativ zu $HOME)
+  venv: venv-nllb          # Python-Umgebung der Übersetzung auf dem Cluster (skripte/a2_nllb_einrichten.sh nvidia ~/venv-nllb)
+  venv_qualitaet: venv-qualitaet   # Umgebung für den Classifier (skripte/hpc/qualitaet_einrichten.sh)
+  snakemake_venv: venv-snakemake   # eigene Umgebung für Snakemake (Python >= 3.11; skripte/hpc/snakemake_einrichten.sh)
+  partition: gpu_h100      # Slurm-Warteschlange für die Übersetzung
+  laufzeit_min: 720        # Höchstdauer je Job in Minuten (gpu_h100: bis 4320)
+  cpus: 24
+  gpus: 1

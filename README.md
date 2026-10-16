@@ -21,21 +21,21 @@ weil er Texte Dritter enthält (siehe `medien_einordnung/README.md`); er ist auf
 
 ## Stichprobe auf einen Blick
 
-Alle 54 Länder stehen in der Stichprobe auf einer Ebene. Es gibt keine Rangfolge nach Wichtigkeit. Die Länder sind hier nur nach
+Alle 74 Länder stehen in der Stichprobe auf einer Ebene. Es gibt keine Rangfolge nach Wichtigkeit. Die Länder sind hier nur nach
 Region geordnet:
 
 | Region | Länder |
 |---|---|
 | Europa (37) | DE, UK, IE, FR, IT, ES, EE, LV, LT, PL, RO, NL, BE, CZ, SE, PT, GR, HU, AT, BG, DK, FI, SK, HR, SI, LU, MT, CY, NO, CH, IS, RS, BA, AL, ME, MK, XK |
-| Afrika (11) | Algerien, Marokko, Tunesien, Senegal, Elfenbeinküste, Nigeria, Südafrika, Angola, Mosambik, DR Kongo, Ruanda |
-| Asien (2) | Indien, Pakistan |
-| Amerika (3) | USA, Brasilien, Argentinien |
+| Afrika (17) | Algerien, Marokko, Tunesien, Senegal, Elfenbeinküste, Nigeria, Südafrika, Angola, Mosambik, DR Kongo, Ruanda, Äthiopien, Ägypten, Tansania, Kenia, Uganda, Sudan |
+| Asien (14) | Indien, Pakistan, China, Indonesien, Bangladesch, Japan, Philippinen, Vietnam, Türkei, Thailand, Myanmar, Südkorea, Irak, Afghanistan |
+| Amerika (5) | USA, Mexiko, Kolumbien, Brasilien, Argentinien |
 | Osteuropa (1) | Russland |
 
 Je Land sind es in der Regel sechs nationale Medien (in einigen Ländern drei bis fünf), in einigen Ländern kommen Regional- und
 Minderheitenmedien hinzu. Alle Analysen, auch die Quellenanalyse, laufen für alle Länder.
 
-Insgesamt 54 Länder und 377 Medien (national, regional/Minderheiten, Übersee). Der Libanon ist als selbst beteiligte Konfliktpartei
+Insgesamt 74 Länder und 488 Medien (national, regional/Minderheiten, Übersee). Der Libanon und der Iran sind als selbst beteiligte Konfliktparteien
 bewusst nicht im Sample. Die Auswahl der Medien ist je Land so angelegt, dass mindestens ein öffentlich-rechtliches Medium dabei ist
 und die übrigen über das politische Spektrum verteilt sind (Tabelle `medien` in `R/01_konfiguration.R`). Die politische Einordnung ist
 bei den Ergänzungen noch `unklar`, bis Belege vorliegen (`medien_einordnung/`). Neu ist die Trägerkategorie `staatlich` für
@@ -104,8 +104,9 @@ konstruierten Wochen (K). Beschreibung und Begründung in `02_pipeline.Rmd`, Abs
    SCRAPER_KONTAKT="Masterarbeit Medienanalyse, Kontakt: name@universitaet.example"   # steht im User-Agent
    ```
 4. Python-Umgebung für die Übersetzung (`~/.virtualenvs/masterarbeit`): `skripte/a2_nllb_einrichten.R` richtet sie unter Windows ein
-   (Python 3.12 über uv, PyTorch mit ROCm für eine AMD-Grafikkarte). Unter Linux die entsprechenden PyTorch-Pakete für die eigene
-   Grafikkarte in derselben Umgebung installieren, danach `transformers` und `sentencepiece`.
+   (Python 3.12 über uv, Standard: PyTorch mit ROCm für eine AMD-Grafikkarte; für NVIDIA vorher `Sys.setenv(MASTERARBEIT_GPU = "nvidia")`).
+   Unter Linux: `skripte/a2_nllb_einrichten.sh amd|nvidia|cpu`. Die AMD-Variante ist auf dem Entwicklungsrechner geprüft, die NVIDIA-Variante
+   (CUDA-Pakete von pytorch.org) noch nicht auf NVIDIA-Hardware; der restliche Code ist für beide gleich (PyTorch nennt auch AMD-Karten "cuda").
 5. Dienste einrichten (Dateien in `systemd/`; Pfade und Benutzer vorher anpassen):
    ```
    # Benutzerdienste: Scraper, Regler, Übersetzer, Dashboard, Live-Server, Endkontrolle
@@ -171,3 +172,36 @@ konstruierten Wochen (K). Beschreibung und Begründung in `02_pipeline.Rmd`, Abs
 - Englische Wörterbücher und Zuschreibungsmuster an Originalsätzen validieren.
 - Anzahl der Themen (K) im STM nach `searchK()` und Lektüre festlegen und begründen.
 - Übersetzungsqualität für Sprachen ohne Vergleichsmodell (Ersatz: Rückübersetzung) klären.
+
+## Workflow (Snakemake)
+
+Übersetzung und Bewertung auf dem bwUniCluster laufen als Snakemake-Workflow mit Abhängigkeitsgraph, fortsetzbar und per Slurm parallel. Aufbau, Graph und Bedienung: [workflow/README.md](workflow/README.md); Zugang zum Cluster: [docs/HPC.md](docs/HPC.md).
+
+```mermaid
+flowchart TB
+    subgraph PC["Eigener PC (Dauerdienste)"]
+        S["Scraper"] --> I["Import in SQLite"] --> U["Übersetzer lokal (NLLB)"] --> R["Relevanz, Korpus, Dashboard"]
+    end
+    subgraph WF["Snakemake-Workflow (Batch)"]
+        E["Aufträge exportieren"] --> H["Hochladen"] --> C["Slurm-Jobs (NLLB auf H100)"] --> D["Herunterladen"] --> M["Import (nllb_hpc)"]
+    end
+    I -. offene Aufträge .-> E
+    M -. Übersetzungen .-> R
+```
+
+Die einzelnen Regeln, jeweils mit ihrem Quelltext:
+
+![Gesamtablauf der Pipeline](workflow/gesamtablauf.svg)
+
+*Gesamtablauf der Pipeline (Blau: eigener PC, Gelb: auch auf dem Cluster).*
+
+![Workflow](workflow/schaubild.svg)
+
+*Letzter Lauf des Workflows, mit Zustand, Protokoll und Zeitbalken.*
+
+```mermaid
+flowchart LR
+    s1["1 · export_auftraege<br/>PC"] --> s2["2 · hochladen<br/>PC"] --> s3["3 · cluster_ausfuehren<br/>PC → Cluster"] --> s4["4 · uebersetzen<br/>Cluster (Slurm)"] --> s5["5 · herunterladen<br/>PC"] --> s6["6 · importieren<br/>PC"] --> s7["7 · korpus<br/>PC"]
+```
+
+Quelltext zu jedem Schritt: [workflow/README.md, Abschnitt "Schaubild mit Code"](workflow/README.md#schaubild-mit-code).

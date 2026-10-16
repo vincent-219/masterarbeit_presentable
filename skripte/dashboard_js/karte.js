@@ -18,6 +18,16 @@
   if (!sel.value && sel.options.length) sel.value = sel.options[0].value;
   if (!geb.value) geb.value = 'welt';
   const alle = topojson.feature(WELT, WELT.objects.countries).features.filter(f => f.id !== '010');   // 010 = Antarktis
+  // Die Krim gehört in der Karte zur Ukraine (völkerrechtlich anerkannte Grenzen): in der Weltgeometrie hängt sie an Russland und wird hier umgehängt.
+  (() => {
+    const ru = alle.find(f => f.id === '643'), ua = alle.find(f => f.id === '804');
+    if (!ru || !ua || ru.geometry.type !== 'MultiPolygon') return;
+    const inKrim = c => { const x = d3.geoCentroid({type: 'Polygon', coordinates: c}); return x[0] > 32.3 && x[0] < 36.8 && x[1] > 44.2 && x[1] < 46.3; };
+    const krim = ru.geometry.coordinates.filter(inKrim);
+    if (!krim.length) return;
+    ru.geometry = {type: 'MultiPolygon', coordinates: ru.geometry.coordinates.filter(c => !inKrim(c))};
+    ua.geometry = {type: 'MultiPolygon', coordinates: (ua.geometry.type === 'Polygon' ? [ua.geometry.coordinates] : ua.geometry.coordinates).concat(krim)};
+  })();
   const geplant = f => !!PLAN[f.id] || (f.properties.name === 'Kosovo' && PLAN.Kosovo);
   const geplantName = f => (PLAN[f.id] || PLAN.Kosovo || [])[0];
   const metaText = f => { const m = META[f.id] || (f.properties.name === 'Kosovo' ? META.Kosovo : null);
@@ -121,7 +131,7 @@
     hinweis.textContent = (regional
       ? 'Countries show only the nationwide outlets; regions as areas (outlined), language groups without a territory of their own as a dot roughly where the group forms a local majority or is most concentrated. '
       : 'All outlets of a country together, including regional and minority media. Hovering over a country shows its continent, UN region and regions/language groups. ')
-      + 'Click a country to zoom in (click it again to zoom out), drag to pan, Ctrl + mouse wheel to zoom. Projection: Equal Earth (equal-area, not Mercator); Antarctica is not drawn. '
+      + 'Click a country to zoom in (click it again to zoom out), drag to pan, Ctrl + mouse wheel to zoom. Projection: Equal Earth (equal-area, not Mercator); Antarctica is not drawn. Borders follow international law as recognised by the UN; Crimea is drawn as part of Ukraine (UN General Assembly resolution 68/262, 2014). '
       + 'Countries in the orange tint are planned for the sample (former colonies, Western Balkans, USA, Russia) and still count as 0.';
   }
   window.karteNeuZeichnen = zeichnen;   // das Live-Panel (live.js) schreibt neue Zahlen in KENNZAHLEN und ruft das hier auf

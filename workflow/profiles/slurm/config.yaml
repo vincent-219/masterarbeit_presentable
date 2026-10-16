@@ -1,0 +1,8 @@
+# Profil für den Cluster: snakemake --profile workflow/profiles/slurm (statt der Einzeloptionen)
+executor: slurm
+jobs: 4
+latency-wait: 60
+rerun-incomplete: true
+default-resources:
+  slurm_partition: gpu_h100
+  runtime: 720

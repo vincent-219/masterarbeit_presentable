@@ -21,21 +21,21 @@ third-party text (see `medien_einordnung/README_en.md`); it is available on requ
 
 ## Sample at a glance
 
-All 54 countries are on the same level in the sample. There is no ranking by importance. They are only grouped by region here:
+All 74 countries are on the same level in the sample. There is no ranking by importance. They are only grouped by region here:
 
 | Region | Countries |
 |---|---|
 | Europe (37) | DE, UK, IE, FR, IT, ES, EE, LV, LT, PL, RO, NL, BE, CZ, SE, PT, GR, HU, AT, BG, DK, FI, SK, HR, SI, LU, MT, CY, NO, CH, IS, RS, BA, AL, ME, MK, XK |
-| Africa (11) | Algeria, Morocco, Tunisia, Senegal, Côte d'Ivoire, Nigeria, South Africa, Angola, Mozambique, DR Congo, Rwanda |
-| Asia (2) | India, Pakistan |
-| Americas (3) | USA, Brazil, Argentina |
+| Africa (17) | Algeria, Morocco, Tunisia, Senegal, Côte d'Ivoire, Nigeria, South Africa, Angola, Mozambique, DR Congo, Rwanda, Ethiopia, Egypt, Tanzania, Kenya, Uganda, Sudan |
+| Asia (14) | India, Pakistan, China, Indonesia, Bangladesh, Japan, Philippines, Vietnam, Türkiye, Thailand, Myanmar, South Korea, Iraq, Afghanistan |
+| Americas (5) | USA, Mexico, Colombia, Brazil, Argentina |
 | Eastern Europe (1) | Russia |
 
 As a rule there are six national outlets per country (three to five in some), and some countries add regional and minority outlets.
 All analyses, including the source analysis, cover all countries.
 
-In total 54 countries and 377 outlets (national, regional/minority, overseas). Lebanon is deliberately not in the sample because it
-is itself a party to the conflict. Per country, at least one public-service outlet is included and the others are spread across the
+In total 74 countries and 488 outlets (national, regional/minority, overseas). Lebanon and Iran are deliberately not in the sample because they
+are themselves parties to the conflict. Per country, at least one public-service outlet is included and the others are spread across the
 political spectrum (table `medien` in `R/01_konfiguration.R`). The political classification of the additions is `unklar` (unclear) until
 evidence is added (`medien_einordnung/`). A new ownership category `staatlich` marks government outlets without public-service
 independence.
@@ -145,3 +145,36 @@ Description and rationale in `02_pipeline_en.Rmd`, section “Periods and Contro
 - Validate English dictionaries and attribution patterns on original sentences.
 - Fix and justify the number of topics (K) in the STM after `searchK()` and reading.
 - Clarify translation quality for languages without a comparison model (substitute: back-translation).
+
+## Cluster workflow (Snakemake)
+
+Bulk translation on the bwUniCluster runs as a Snakemake workflow (export, upload, one GPU Slurm job per package, download, import; resumable). Graph and usage: [workflow/README.md](workflow/README.md); the dashboard has a "Workflow (Snakemake)" section. The continuous local translator remains for the incoming trickle of new articles.
+
+```mermaid
+flowchart TB
+    subgraph PC["Own PC (always-on services)"]
+        S["Scraper"] --> I["Import into SQLite"] --> U["Local translator (NLLB)"] --> R["Relevance, corpus, dashboard"]
+    end
+    subgraph WF["Snakemake workflow (batch)"]
+        E["Export packages"] --> H["Upload"] --> C["Slurm jobs (NLLB on H100)"] --> D["Download"] --> M["Import (nllb_hpc)"]
+    end
+    I -. open items .-> E
+    M -. translations .-> R
+```
+
+The individual rules, each with its source code:
+
+![Gesamtablauf der Pipeline](workflow/gesamtablauf.svg)
+
+*Overall pipeline (blue: own PC, yellow: also on the cluster).*
+
+![Workflow](workflow/schaubild.svg)
+
+*Last workflow run, with state, transcript and timeline.*
+
+```mermaid
+flowchart LR
+    s1["1 · export_auftraege<br/>PC"] --> s2["2 · hochladen<br/>PC"] --> s3["3 · cluster_ausfuehren<br/>PC → cluster"] --> s4["4 · uebersetzen<br/>cluster (Slurm)"] --> s5["5 · herunterladen<br/>PC"] --> s6["6 · importieren<br/>PC"] --> s7["7 · korpus<br/>PC"]
+```
+
+Source code for every step: [workflow/README.md, section "Schaubild mit Code"](workflow/README.md#schaubild-mit-code) (German).

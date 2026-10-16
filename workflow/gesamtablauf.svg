@@ -1,0 +1,41 @@
+<svg class="wfsvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" font-family="ui-monospace,Menlo,Consolas,monospace" style="width:100%;max-width:900px;">
+<defs><marker id="pg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" fill="#a855f7"/></marker></defs>
+<g class="bs" data-k="stufe1" style="cursor:pointer"><rect x="35" y="30" width="190" height="104" rx="8" fill="transparent" stroke="#3b82f6" stroke-width="1.8"/><circle cx="57" cy="54" r="12" fill="none" stroke="#a855f7" stroke-width="2"/><text x="57" y="58" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">1</text><text x="77" y="58" fill="#6e7781" font-size="12.5" font-weight="bold">Collect URLs</text>
+<text x="49" y="84" fill="#7d8590" font-size="10.5">R/14_url_sammler.R · Media</text>
+<text x="49" y="98" fill="#7d8590" font-size="10.5">Cloud, sitemaps</text>
+<text x="213" y="124" text-anchor="end" fill="#3b82f6" font-size="10">PC</text></g>
+<g class="bs" data-k="stufe2" style="cursor:pointer"><rect x="255" y="30" width="190" height="104" rx="8" fill="transparent" stroke="#3b82f6" stroke-width="1.8"/><circle cx="277" cy="54" r="12" fill="none" stroke="#a855f7" stroke-width="2"/><text x="277" y="58" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">2</text><text x="297" y="58" fill="#6e7781" font-size="12.5" font-weight="bold">Fetch full texts</text>
+<text x="269" y="84" fill="#7d8590" font-size="10.5">R/15_volltext.R · scraper</text>
+<text x="433" y="124" text-anchor="end" fill="#3b82f6" font-size="10">PC</text></g>
+<g class="bs" data-k="stufe3" style="cursor:pointer"><rect x="475" y="30" width="190" height="104" rx="8" fill="transparent" stroke="#3b82f6" stroke-width="1.8"/><circle cx="497" cy="54" r="12" fill="none" stroke="#a855f7" stroke-width="2"/><text x="497" y="58" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">3</text><text x="517" y="58" fill="#6e7781" font-size="12.5" font-weight="bold">Nexis export</text>
+<text x="489" y="84" fill="#7d8590" font-size="10.5">nexis/ · manual export, uni</text>
+<text x="489" y="98" fill="#7d8590" font-size="10.5">VPN</text>
+<text x="653" y="124" text-anchor="end" fill="#3b82f6" font-size="10">PC</text></g>
+<g class="bs" data-k="stufe4" style="cursor:pointer"><rect x="695" y="30" width="190" height="104" rx="8" fill="transparent" stroke="#3b82f6" stroke-width="1.8"/><circle cx="717" cy="54" r="12" fill="none" stroke="#a855f7" stroke-width="2"/><text x="717" y="58" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">4</text><text x="737" y="58" fill="#6e7781" font-size="12.5" font-weight="bold">Import, filter</text>
+<text x="709" y="84" fill="#7d8590" font-size="10.5">R/02, R/03 · SQLite, coarse</text>
+<text x="709" y="98" fill="#7d8590" font-size="10.5">filter, cld2</text>
+<text x="873" y="124" text-anchor="end" fill="#3b82f6" font-size="10">PC</text></g>
+<g class="bs" data-k="stufe5" style="cursor:pointer"><rect x="35" y="200" width="190" height="104" rx="8" fill="transparent" stroke="#d4a017" stroke-width="1.8"/><circle cx="57" cy="224" r="12" fill="none" stroke="#a855f7" stroke-width="2"/><text x="57" y="228" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">5</text><text x="77" y="228" fill="#6e7781" font-size="12.5" font-weight="bold">Translate (NLLB)</text>
+<text x="49" y="254" fill="#7d8590" font-size="10.5">local: always-on service ·</text>
+<text x="49" y="268" fill="#7d8590" font-size="10.5">bulk: Snakemake</text>
+<text x="213" y="294" text-anchor="end" fill="#d4a017" font-size="10">PC + cluster</text></g>
+<g class="bs" data-k="stufe6" style="cursor:pointer"><rect x="255" y="200" width="190" height="104" rx="8" fill="transparent" stroke="#d4a017" stroke-width="1.8"/><circle cx="277" cy="224" r="12" fill="none" stroke="#a855f7" stroke-width="2"/><text x="277" y="228" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">6</text><text x="297" y="228" fill="#6e7781" font-size="12.5" font-weight="bold">Check quality</text>
+<text x="269" y="254" fill="#7d8590" font-size="10.5">Hy-MT2 cross-check ·</text>
+<text x="269" y="268" fill="#7d8590" font-size="10.5">classifier (pairs, scoring)</text>
+<text x="433" y="294" text-anchor="end" fill="#d4a017" font-size="10">PC + cluster</text></g>
+<g class="bs" data-k="stufe7" style="cursor:pointer"><rect x="475" y="200" width="190" height="104" rx="8" fill="transparent" stroke="#3b82f6" stroke-width="1.8"/><circle cx="497" cy="224" r="12" fill="none" stroke="#a855f7" stroke-width="2"/><text x="497" y="228" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">7</text><text x="517" y="228" fill="#6e7781" font-size="12.5" font-weight="bold">Relevance, corpus</text>
+<text x="489" y="254" fill="#7d8590" font-size="10.5">run_nightly.R ·</text>
+<text x="489" y="268" fill="#7d8590" font-size="10.5">korpus_export.py</text>
+<text x="653" y="294" text-anchor="end" fill="#3b82f6" font-size="10">PC</text></g>
+<g class="bs" data-k="stufe8" style="cursor:pointer"><rect x="695" y="200" width="190" height="104" rx="8" fill="transparent" stroke="#3b82f6" stroke-width="1.8"/><circle cx="717" cy="224" r="12" fill="none" stroke="#a855f7" stroke-width="2"/><text x="717" y="228" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">8</text><text x="737" y="228" fill="#6e7781" font-size="12.5" font-weight="bold">Analysis</text>
+<text x="709" y="254" fill="#7d8590" font-size="10.5">R/*.R · dashboard</text>
+<text x="709" y="268" fill="#7d8590" font-size="10.5">(live_dashboard.py)</text>
+<text x="873" y="294" text-anchor="end" fill="#3b82f6" font-size="10">PC</text></g>
+<line x1="225" y1="82" x2="253" y2="82" stroke="#a855f7" stroke-width="1.6" marker-end="url(#pg)"/>
+<line x1="445" y1="82" x2="473" y2="82" stroke="#a855f7" stroke-width="1.6" marker-end="url(#pg)"/>
+<line x1="665" y1="82" x2="693" y2="82" stroke="#a855f7" stroke-width="1.6" marker-end="url(#pg)"/>
+<path d="M790.0 134 C 790.0 174, 130.0 160, 130.0 198" fill="none" stroke="#a855f7" stroke-width="1.6" marker-end="url(#pg)"/>
+<line x1="225" y1="252" x2="253" y2="252" stroke="#a855f7" stroke-width="1.6" marker-end="url(#pg)"/>
+<line x1="445" y1="252" x2="473" y2="252" stroke="#a855f7" stroke-width="1.6" marker-end="url(#pg)"/>
+<line x1="665" y1="252" x2="693" y2="252" stroke="#a855f7" stroke-width="1.6" marker-end="url(#pg)"/>
+<rect x="30" y="316" width="12" height="9" fill="none" stroke="#3b82f6"/><text x="48" y="324" fill="#7d8590" font-size="10">own PC</text><rect x="140" y="316" width="12" height="9" fill="none" stroke="#d4a017"/><text x="158" y="324" fill="#7d8590" font-size="10">also on the bwUniCluster (Snakemake)</text><text x="30" y="350" fill="#7d8590" font-size="10">Arrows = path of one article, not a time order: the stages run at the same time, each on different articles (assembly line).</text></svg>

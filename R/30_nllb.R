@@ -15,11 +15,30 @@ schutz_begriffe <- function(satz) {
   unique(c(marken, paare[, 2], paare[, 3]))
 }
 
+# Satzgrenzen: Latein/Kyrillisch/Griechisch nach [.!?] plus Leerzeichen und Großbuchstabe (wie bisher); zusätzlich ohne Leerzeichen-Bedingung nach
+# dem Satzzeichen von Chinesisch/Japanisch (。！？), Hindi/Bengali (।), Urdu (۔), Arabisch (؟), Amharisch (።), Birmanisch (။) (ergänzt 16.10.2026).
+# Sehr lange Stücke ohne Satzzeichen (Thai, Birmanisch, ungepflegte Texte) werden an Leerzeichen auf höchstens 300 Zeichen geteilt, sonst schneidet NLLB bei 256 Tokens ab.
 satz_stuecke <- function(t) {
   if (is.na(t) || !nzchar(str_trim(t))) return(character(0))
   absaetze <- str_split(t, "\\n+")[[1]]
-  saetze <- unlist(map(absaetze, \(a) str_split(str_squish(a), "(?<![0-9]\\.)(?<!\\b\\p{L}\\.)(?<!\\b(Dr|Nr|St|Prof|bzw|ca|vgl|Hr|Fr|Mr|Mrs|Ms|nt|jt|lk)\\.)(?<=[.!?]|[.!?][\"“”»'])\\s+(?=[\"„“»\\p{Lu}0-9])")[[1]]))
-  saetze[nzchar(saetze)]
+  saetze <- unlist(map(absaetze, \(a) {
+    a <- str_replace_all(str_squish(a), "([。！？।۔؟።။]+[」』”’\"')）]*)\\s*", "\\1\n")
+    unlist(map(str_split(a, "\\n")[[1]], \(b) str_split(b, "(?<![0-9]\\.)(?<!\\b\\p{L}\\.)(?<!\\b(Dr|Nr|St|Prof|bzw|ca|vgl|Hr|Fr|Mr|Mrs|Ms|nt|jt|lk)\\.)(?<=[.!?]|[.!?][\"“”»'])\\s+(?=[\"„“»\\p{Lu}0-9])")[[1]]))
+  }))
+  saetze <- saetze[nzchar(saetze)]
+  unlist(map(saetze, lange_teilen))
+}
+
+lange_teilen <- function(x, max_zeichen = 300) {
+  if (nchar(x) <= max_zeichen) return(x)
+  worte <- str_split(x, "(?<=\\s)")[[1]]       # an Leerzeichen; ohne Leerzeichen (Chinesisch ohne Satzzeichen) hart nach max_zeichen
+  out <- character(0); akt <- ""
+  for (w in worte) {
+    while (nchar(w) > max_zeichen) { if (nzchar(akt)) { out <- c(out, akt); akt <- "" }; out <- c(out, substr(w, 1, max_zeichen)); w <- substr(w, max_zeichen + 1, nchar(w)) }
+    if (nchar(akt) + nchar(w) > max_zeichen && nzchar(akt)) { out <- c(out, akt); akt <- w } else akt <- paste0(akt, w)
+  }
+  out <- c(out, akt)
+  str_trim(out[nzchar(str_trim(out))])
 }
 
 # Wo liegt die Python-Umgebung? Bewusst ein fester, absoluter Pfad: "~" bedeutet in R unter

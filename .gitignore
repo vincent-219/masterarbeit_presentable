@@ -30,3 +30,6 @@ __pycache__/
 *.bak*
 watch_*
 scraping.log
+
+.snakemake/
+__pycache__/

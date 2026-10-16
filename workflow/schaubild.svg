@@ -1,0 +1,40 @@
+<svg class="wfsvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 126 900 520" font-family="ui-monospace,Menlo,Consolas,monospace" style="width:100%;max-width:900px;">
+<defs><marker id="pf" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" fill="#8b949e"/></marker></defs>
+<rect x="100" y="138" width="100" height="24" rx="12" fill="none" stroke="#8b949e"/><text x="150" y="155" text-anchor="middle" fill="#6e7781" font-size="12" font-weight="bold">done</text>
+<line x1="150" y1="162" x2="150" y2="242" stroke="#8b949e"/>
+<rect x="92" y="242" width="116" height="56" rx="14" fill="none" stroke="#a855f7" stroke-width="3"/><text x="150" y="274" text-anchor="middle" fill="#6e7781" font-weight="bold" font-size="13">snakemake</text>
+<path d="M208 270 C 330 270, 330 157, 440 157" fill="none" stroke="#a855f7" stroke-width="1.4" opacity="0.8"/>
+<g class="bs" data-k="export_auftraege" style="cursor:pointer"><rect x="440" y="140" width="260" height="34" rx="6" fill="transparent" stroke="#d4a017" stroke-width="1.8"/><text x="456" y="161" fill="#6e7781" font-size="14">export_auftraege</text><text x="686" y="161" text-anchor="end" fill="#7d8590" font-size="11">PC</text>
+<text x="716" y="161" fill="#d4a017" font-size="12">✓</text></g>
+<path d="M208 270 C 330 270, 330 197, 440 197" fill="none" stroke="#a855f7" stroke-width="1.4" opacity="0.8"/>
+<g class="bs" data-k="hochladen" style="cursor:pointer"><rect x="440" y="180" width="260" height="34" rx="6" fill="transparent" stroke="#d4a017" stroke-width="1.8"/><text x="456" y="201" fill="#6e7781" font-size="14">hochladen</text><text x="686" y="201" text-anchor="end" fill="#7d8590" font-size="11">PC</text>
+<text x="716" y="201" fill="#d4a017" font-size="12">✓</text></g>
+<path d="M208 270 C 330 270, 330 237, 440 237" fill="none" stroke="#a855f7" stroke-width="1.4" opacity="0.8"/>
+<g class="bs" data-k="cluster_ausfuehren" style="cursor:pointer"><rect x="440" y="220" width="260" height="34" rx="6" fill="transparent" stroke="#d4a017" stroke-width="1.8"/><text x="456" y="241" fill="#6e7781" font-size="14">cluster_ausfuehren</text><text x="686" y="241" text-anchor="end" fill="#7d8590" font-size="11">PC → cluster</text>
+<text x="716" y="241" fill="#d4a017" font-size="12">✓</text></g>
+<path d="M208 270 C 330 270, 330 277, 440 277" fill="none" stroke="#a855f7" stroke-width="1.4" opacity="0.8"/>
+<g class="bs" data-k="uebersetzen" style="cursor:pointer"><rect x="440" y="260" width="260" height="34" rx="6" fill="transparent" stroke="#d4a017" stroke-width="1.8"/><text x="456" y="281" fill="#6e7781" font-size="14">uebersetzen</text><text x="686" y="281" text-anchor="end" fill="#7d8590" font-size="11">cluster · Slurm</text>
+<text x="716" y="281" fill="#d4a017" font-size="12">✓</text></g>
+<path d="M208 270 C 330 270, 330 317, 440 317" fill="none" stroke="#a855f7" stroke-width="1.4" opacity="0.8"/>
+<g class="bs" data-k="herunterladen" style="cursor:pointer"><rect x="440" y="300" width="260" height="34" rx="6" fill="transparent" stroke="#d4a017" stroke-width="1.8"/><text x="456" y="321" fill="#6e7781" font-size="14">herunterladen</text><text x="686" y="321" text-anchor="end" fill="#7d8590" font-size="11">PC</text>
+<text x="716" y="321" fill="#d4a017" font-size="12">✓</text></g>
+<path d="M208 270 C 330 270, 330 357, 440 357" fill="none" stroke="#a855f7" stroke-width="1.4" opacity="0.8"/>
+<g class="bs" data-k="importieren" style="cursor:pointer"><rect x="440" y="340" width="260" height="34" rx="6" fill="transparent" stroke="#d4a017" stroke-width="1.8"/><text x="456" y="361" fill="#6e7781" font-size="14">importieren</text><text x="686" y="361" text-anchor="end" fill="#7d8590" font-size="11">PC</text>
+<text x="716" y="361" fill="#d4a017" font-size="12">✓</text></g>
+<path d="M208 270 C 330 270, 330 397, 440 397" fill="none" stroke="#a855f7" stroke-width="1.4" opacity="0.8"/>
+<g class="bs" data-k="korpus" style="cursor:pointer"><rect x="440" y="380" width="260" height="34" rx="6" fill="transparent" stroke="#3b82f6" stroke-width="1.8"/><text x="456" y="401" fill="#6e7781" font-size="14">korpus</text><text x="686" y="401" text-anchor="end" fill="#7d8590" font-size="11">PC</text>
+<text x="716" y="401" fill="#3b82f6" font-size="12">…</text></g>
+<text x="50" y="430" fill="#7d8590" font-size="11" letter-spacing="2">TRANSCRIPT</text><text x="850" y="430" text-anchor="end" fill="#7d8590" font-size="11">probe2</text>
+<rect x="50" y="438" width="800" height="62" rx="6" fill="none" stroke="#8b949e"/>
+<rect x="60" y="446" width="3" height="12" fill="#d4a017"/><text x="72" y="456" fill="#6e7781" font-size="11">Finished jobid: 0 (Rule: alle)</text>
+<rect x="60" y="462" width="3" height="12" fill="#d4a017"/><text x="72" y="472" fill="#6e7781" font-size="11">2 of 2 steps (100%) done</text>
+<rect x="60" y="478" width="3" height="12" fill="#d4a017"/><text x="72" y="488" fill="#6e7781" font-size="11">Elapsed time: 0:05:40.702295</text>
+<text x="50" y="526" fill="#7d8590" font-size="11" letter-spacing="2">TIMELINE</text>
+<text x="850" y="526" text-anchor="end" fill="#d4a017" font-size="13" font-weight="bold">5 min 56 s total</text>
+<text x="50" y="543" fill="#d4a017" font-size="10">export_auftraege</text><rect x="200.0" y="534" width="5.4" height="10" rx="2" fill="#3b82f6"/><text x="209.4" y="543" text-anchor="start" fill="#7d8590" font-size="9">3 s</text>
+<text x="50" y="557" fill="#d4a017" font-size="10">hochladen</text><rect x="205.4" y="548" width="8.1" height="10" rx="2" fill="#3b82f6"/><text x="217.5" y="557" text-anchor="start" fill="#7d8590" font-size="9">4 s</text>
+<text x="50" y="571" fill="#d4a017" font-size="10">cluster_ausfuehren</text><rect x="213.5" y="562" width="623.3" height="10" rx="2" fill="#3b82f6"/><text x="209.5" y="571" text-anchor="end" fill="#7d8590" font-size="9">347 s</text>
+<text x="50" y="585" fill="#d4a017" font-size="10">uebersetzen</text><rect x="836.8" y="576" width="3.0" height="10" rx="2" fill="#3b82f6"/><text x="832.8" y="585" text-anchor="end" fill="#7d8590" font-size="9">0 s</text>
+<text x="50" y="599" fill="#d4a017" font-size="10">herunterladen</text><rect x="836.8" y="590" width="3.0" height="10" rx="2" fill="#3b82f6"/><text x="832.8" y="599" text-anchor="end" fill="#7d8590" font-size="9">1 s</text>
+<text x="50" y="613" fill="#d4a017" font-size="10">importieren</text><rect x="839.5" y="604" width="3.0" height="10" rx="2" fill="#3b82f6"/><text x="835.5" y="613" text-anchor="end" fill="#7d8590" font-size="9">0 s</text>
+</svg>

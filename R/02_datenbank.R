@@ -77,7 +77,8 @@ artikel_importieren <- function(con, df, quelle) {
       relevant = NA_integer_, dublette_von = NA_character_, validierung = 0L,
       quelle = quelle, importiert = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
       # Kontrolle: Welche Sprache erkennt cld2 im Text? (NA = nicht sicher erkennbar)
-      sprache_erkannt = toupper(cld2::detect_language(paste(titel, halbseite_original)))
+      sprache_erkannt = recode(toupper(cld2::detect_language(paste(titel, halbseite_original))),
+                               "ZH-HANT" = "ZH", "NN" = "NO", .default = NULL)
     ) |>
     select(id, land, medium, stufe, sprache, datum, zeitraum, url, titel,
            text_original = text, lead_original, halbseite_original,

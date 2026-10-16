@@ -1,0 +1,37 @@
+# Snakemake-Workflow der Masterarbeit, CLUSTER-Teil (läuft auf dem Login-Knoten des bwUniCluster 3.0; jeder Schritt wird als Slurm-Job eingereicht).
+# Wird vom lokalen Workflow (workflow/Snakefile, Regel cluster_ausfuehren) per SSH gestartet; im Cluster-Ordner liegt diese Datei als "Snakefile".
+# Erwartet im Arbeitsordner: auftraege/<lauf>/<feld>/auftrag_<feld>_<nnn>.jsonl.gz, nllb_cluster.py, config.yaml.
+# Einmalig auf dem Cluster: snakemake_einrichten.sh (Umgebung ~/venv-snakemake mit Python >= 3.11); die Übersetzung selbst läuft in ~/venv-nllb (siehe docs/HPC.md).
+#
+#   snakemake -s Snakefile --config lauf=2026-10-16 felder='[titel]' --executor slurm --jobs 4
+#
+# Slurm-Hinweis: Das Plug-in fragt den Zustand der Jobs selbst und in vernünftigen Abständen ab (die Cluster-Regel: Slurm-Befehle nicht öfter als alle 30 Sekunden).
+configfile: "config.yaml"
+
+LAUF = config["lauf"]
+FELDER = config["felder"]
+PAKETE = {f: glob_wildcards(f"auftraege/{LAUF}/{f}/auftrag_{f}_{{nr}}.jsonl.gz").nr for f in FELDER}
+
+
+rule alle:
+    input:
+        [f"ergebnisse/{LAUF}/{f}/ergebnis_{f}_{nr}.jsonl.gz" for f in FELDER for nr in PAKETE[f]],
+
+
+rule uebersetzen:
+    """Ein Paket mit NLLB auf einer GPU übersetzen (Testversion ohne Glossar und Namensschutz; Engine nllb_hpc, siehe docs/HPC.md)."""
+    input:
+        "auftraege/" + LAUF + "/{feld}/auftrag_{feld}_{nr}.jsonl.gz",
+    output:
+        "ergebnisse/" + LAUF + "/{feld}/ergebnis_{feld}_{nr}.jsonl.gz",
+    resources:
+        slurm_partition=config.get("partition") or config["cluster"]["partition"],
+        runtime=int(config.get("laufzeit_min") or config["cluster"]["laufzeit_min"]),
+        cpus_per_task=config["cluster"]["cpus"],
+        gres=f"gpu:{config['cluster']['gpus']}",
+    log:
+        "logs/" + LAUF + "/uebersetzen_{feld}_{nr}.log",
+    params:
+        venv=config["cluster"]["venv"],
+    shell:
+        "source ~/{params.venv}/bin/activate && python nllb_cluster.py {input} {output} --batch 128 > {log} 2>&1"

@@ -341,3 +341,40 @@ entstanden ist.
   `tps00001`, Stand 01.01.2026): Genau 19 EU-Staaten liegen darüber, DE, FR, IT, ES, IE
   (5,51 Mio.) und die 14 weiteren Länder PL, RO, NL, BE, PT, CZ, SE, GR, HU, AT, BG, DK, FI, SK (Slowakei
   5,41 Mio. knapp darüber). Kroatien (3,88 Mio.) und die kleineren Staaten nur im Überblick.
+
+## 16.10.2026 – Karte: Krim wird zur Ukraine gezeichnet (völkerrechtlich anerkannte Grenzen)
+- Die Weltgeometrie der Dashboard-Karte (Natural Earth über world-atlas, `data/live/vendor/countries-50m.json`) führt die Krim als Teil Russlands.
+  `skripte/dashboard_js/karte.js` hängt dieses Teilstück beim Laden an die Ukraine um (Erkennung über die Koordinaten der Halbinsel).
+- **Begründung:** Die Karte folgt den völkerrechtlich anerkannten Staatsgrenzen. Die UN-Generalversammlung hat in Resolution 68/262 (27.03.2014) die territoriale
+  Integrität der Ukraine innerhalb ihrer international anerkannten Grenzen bekräftigt und das Krim-Referendum für ungültig erklärt; die Annexion wird von der
+  großen Mehrheit der Staaten nicht anerkannt. Maßgeblich ist hier der Stand des Völkerrechts, nicht die faktische Kontrolle.
+- **Reichweite:** Nur die Zeichnung ändert sich. Zuordnung und Zahlen hängen am Land des Mediums (laender/medien), nicht an der Geografie; es gibt keine Zählung nach Gebieten innerhalb der Ukraine.
+- Wer die Arbeit mit anderer Kartengrundlage reproduziert, sollte diese Festlegung nennen.
+
+## 16.10.2026 – 20 weitere Länder (alle über 50 Mio. Einwohner) und Fehler im Grobfilter für nicht-lateinische Schriften
+- **Länder:** China, Indonesien, Bangladesch, Äthiopien, Mexiko, Japan, Ägypten, Philippinen, Vietnam, Türkei, Thailand, Tansania, Kenia, Myanmar, Kolumbien,
+  Südkorea, Uganda, Sudan, Irak, Afghanistan; Stufe "vergleich", 111 Medien (`medien_gross` in `R/01_konfiguration.R`, Startseiten geprüft; nicht erreichbar und deshalb
+  ausgelassen: Guancha, NHK, Kyodo News, The Philippine Star, Tasnim, New Vision). Neue Sprachen in `sprachen`: ZH, JA, KO, TH, VI, ID, BN, FA, AM, SW, MY, TL, KU, PS (NLLB-Codes).
+  Auswahl der Medien nach Bekanntheit, nicht aus einem Verzeichnis; Ausrichtung "unklar".
+- **Iran** ist Konfliktpartei (Krieg mit Israel 2025) und wurde am 16.10.2026 wieder entfernt, wie zuvor der Libanon (14.10.2026): Land, Kürzel und die fünf Medien (IRNA, Hamshahri, Shargh, Tehran Times, Press TV) sind aus `R/01_konfiguration.R` gestrichen. Persisch (FA) bleibt wegen Afghanistan (Dari). Zu diesem Zeitpunkt gab es keine Iran-Artikel in der Datenbank.
+- **Fehler gefunden und behoben:** `grob_regex` (R/03_vorverarbeitung.R) kannte keine arabischen, Urdu-, Hindi- oder sonstigen nicht-lateinischen Begriffe. Dadurch bekamen arabische und
+  Urdu-Artikel nie `grobfilter = 1` (10.592 Artikel, davon nur 4 Treffer) und wurden weder übersetzt noch analysiert. Die Regex wurde um Arabisch, Persisch, Urdu, Hindi, Bengali, Chinesisch,
+  Japanisch, Koreanisch, Thai, Birmanisch, Amharisch und Kurdisch erweitert (ebenso die URL-Relevanz und die Media-Cloud-Suche). `skripte/grobfilter_neu.R` hat den Filter für die vorhandenen Artikel
+  neu berechnet: 9.097 Artikel (AR 2.642, UR 6.455) sind neu im Korpus. Hindi-Artikel gab es noch nicht.
+- **Textverarbeitung für neue Schriften:** Satzteilung (`satz_stuecke` in R, ebenso in `skripte/hpc/nllb_cluster.py` und `skripte/qualitaet_halbseite.py`) erkennt 。！？ । ۔ ؟ ። ။ ohne Leerzeichen; lange Stücke
+  ohne Satzzeichen (Thai) werden auf höchstens 300 Zeichen geteilt; `kuerzen_auf_satz` kennt dieselben Satzenden; die Spracherkennung (cld2) wird für ZH-HANT und NN auf ZH und NO normiert.
+- **Media Cloud:** Neue Medien holen ihre URLs über `b2_alle_scrapen.R nur-volltexte` automatisch zuerst (Schritt "neue Medien"). Der Cache für diesen Schritt hat jetzt einen Namen aus den Quell-IDs
+  statt des festen Präfixes "neu_", der mit früheren Monatsdateien kollidiert wäre.
+- **Offen:** Der Qualitäts-Classifier ist für die neuen Sprachen noch nicht trainiert (Daten fehlen noch); Training auf dem Cluster mit allen Sprachen, die Hy-MT2 kann, danach neu bewerten.
+
+## 16.10.2026 – Snakemake für Cluster-Arbeit (Übersetzung, Bewertung)
+- Rechenintensive Batch-Schritte laufen als Snakemake-Workflow (`workflow/`): lokaler Teil (Export, Hochladen, Import, Korpusexport) und Cluster-Teil (je Paket ein Slurm-Job mit GPU). Begründung und Graph: `workflow/README.md`.
+- Nicht im Graphen: Scraper, Importeur und lokaler Übersetzer. Ihr Engpass sind Wartezeiten und Kontingente, nicht Abhängigkeiten; sie bleiben fortsetzbare Dienste mit Wache.
+- Ergebnisse vom Cluster tragen die Engine `nllb_hpc` (Testversion ohne Glossar und Namensschutz), bis ein Vergleich mit der lokalen Übersetzung vorliegt.
+
+## 16.10.2026 – Ersatzreferenz für Sprachen ohne Hy-MT2: Rückübersetzung mit NLLB
+- Hy-MT2 (zweites Modell für die Querprüfung und das Label des Qualitäts-Classifiers) deckt nicht alle Sprachen ab. Für die übrigen wird die englische NLLB-Fassung mit NLLB **zurück in die Originalsprache** übersetzt und mit dem Original verglichen (Satz-Einbettungen und chrF, `skripte/hpc/qualitaet_cluster.py rueck`).
+- **Einschränkung:** Hin- und Rückrichtung stammen vom selben Modell, Fehler können sich teilweise aufheben; das Verfahren ist also strenger an das Original gebunden, aber nicht unabhängig wie Hy-MT2. Die Schwellen (Einbettungsähnlichkeit 0,80, chrF 35 statt 45) sind vorläufig.
+- **Kalibrierung:** Für die zehn Sprachen mit beiden Referenzen (DE IT ES FR PT PL CS NL RU TR) wird zusätzlich `rueck` gerechnet und die Übereinstimmung der Labels mit dem Hy-MT2-Label gemessen; erst danach gelten Bewertungen für die übrigen Sprachen als belastbar. Der Classifier bleibt eine Markierung, kein Filter.
+- Das Modell lernt die Sprachenliste aus den Paaren (`sprachen` in der Modelldatei), nicht mehr aus einer festen Liste.
+

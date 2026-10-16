@@ -61,7 +61,28 @@ laender <- tribble(
   "Demokratische Republik Kongo", "CD", "vergleich",
   "Ruanda",       "RW", "vergleich",
   "Vereinigte Staaten", "US", "vergleich",
-  "Russland",     "RU", "vergleich"
+  "Russland",     "RU", "vergleich",
+  # Alle weiteren Länder mit mehr als 50 Mio. Einwohnern (ergänzt am 16.10.2026; Iran bewusst nicht aufgenommen: Konfliktpartei, siehe ENTSCHEIDUNGEN.md)
+  "China", "CN", "vergleich",
+  "Indonesien", "ID", "vergleich",
+  "Bangladesch", "BD", "vergleich",
+  "Äthiopien", "ET", "vergleich",
+  "Mexiko", "MX", "vergleich",
+  "Japan", "JP", "vergleich",
+  "Ägypten", "EG", "vergleich",
+  "Philippinen", "PH", "vergleich",
+  "Vietnam", "VN", "vergleich",
+  "Türkei", "TR", "vergleich",
+  "Thailand", "TH", "vergleich",
+  "Tansania", "TZ", "vergleich",
+  "Kenia", "KE", "vergleich",
+  "Myanmar", "MM", "vergleich",
+  "Kolumbien", "CO", "vergleich",
+  "Südkorea", "KR", "vergleich",
+  "Uganda", "UG", "vergleich",
+  "Sudan", "SD", "vergleich",
+  "Irak", "IQ", "vergleich",
+  "Afghanistan", "AF", "vergleich"
 )
 
 ## ---- sprachen ----
@@ -108,7 +129,22 @@ sprachen <- tribble(
   "AR",     "arb_Arab",  # Arabisch (Hochsprache)
   "HI",     "hin_Deva",  # Hindi
   "UR",     "urd_Arab",  # Urdu
-  "RW",     "kin_Latn"   # Kinyarwanda
+  "RW",     "kin_Latn",  # Kinyarwanda
+  # Länder mit mehr als 50 Mio. Einwohnern (16.10.2026). Kürzel wie die Spracherkennung cld2 sie liefert (Persisch und Dari: FA).
+  "ZH",     "zho_Hans",  # Chinesisch (vereinfacht)
+  "JA",     "jpn_Jpan",  # Japanisch
+  "KO",     "kor_Hang",  # Koreanisch
+  "TH",     "tha_Thai",  # Thai
+  "VI",     "vie_Latn",  # Vietnamesisch
+  "ID",     "ind_Latn",  # Indonesisch
+  "BN",     "ben_Beng",  # Bengalisch
+  "FA",     "pes_Arab",  # Persisch (Iran; Dari in Afghanistan wird ebenfalls als FA erkannt)
+  "AM",     "amh_Ethi",  # Amharisch
+  "SW",     "swh_Latn",  # Suaheli
+  "MY",     "mya_Mymr",  # Birmanisch
+  "TL",     "tgl_Latn",  # Tagalog/Filipino
+  "KU",     "ckb_Arab",  # Kurdisch (Sorani)
+  "PS",     "pbt_Arab"   # Paschtu
 )
 
 ## ---- medien ----
@@ -412,7 +448,8 @@ medien_regional <- tribble(
 # Nicht aufgenommen: nicht erreichbar / DNS fehlt / 404 (u. a. Zëri, Al-Yaoum 24, Assabah, Sud Quotidien,
 # Dakaractu, DD News, La Prospérité, Télam, Angop, Expansão, Folha 8, Izuba Rirashe, Washington Post,
 # RIA Novosti, Rossijskaja Gaseta) sowie harte Paywall (WSJ 401, USA Today 402, RBK 401).
-# Libanon nicht aufgenommen: selbst Konfliktpartei (Beschluss 14.10.2026).
+# HTTP 403 bleibt drin.
+# Libanon nicht aufgenommen: Konfliktpartei (Beschluss 14.10.2026).
 # Elfenbeinküste: kein Vorschlag in der Kandidatenliste, Auswahl ergänzt (Erreichbarkeit beim URL-Sammeln geprüft).
 # Ausrichtung bewusst "unklar" (die Einschätzung in der Kandidatenliste ist nicht belegt);
 # traeger "staatlich" = Regierungs-/Staatsmedium ohne öffentlich-rechtliche Unabhängigkeit; Paywall geschätzt.
@@ -539,7 +576,129 @@ medien_vergleich <- tribble(
   "Russland", "Moskowski Komsomolez", "RU", "mk.ru", "privat", "unklar", "boulevard", "nein", "scraper", "sitemap"
 )
 
-medien <- bind_rows(mutate(bind_rows(medien, medien_aufstockung, medien_vergleich), region = NA_character_), medien_regional) |>
+## ---- medien-gross ----
+# Länder mit mehr als 50 Mio. Einwohnern, die noch fehlten (ergänzt am 16.10.2026): 111 Medien in 20 Ländern.
+# Auswahl: je 4 bis 6 große nationale Medien, Mischung aus Staats- und Privatmedien, englisch- und
+# landessprachig), Startseite per HTTP geprüft. Nicht aufgenommen, weil nicht erreichbar: Guancha, NHK, Kyodo News, The Philippine Star,
+# Tasnim, New Vision (Uganda). HTTP 403 bleibt drin.
+# Ausrichtung bewusst "unklar" (nicht belegt); traeger "staatlich" = Staatsmedium ohne öffentlich-rechtliche Unabhängigkeit; Paywall geschätzt.
+# Iran und Libanon sind Konfliktparteien und bewusst nicht im Sample (Beschlüsse 14.10. und 16.10.2026).
+medien_gross <- tribble(
+  ~land, ~medium, ~sprache, ~domain, ~traeger, ~ausrichtung, ~typ, ~paywall, ~zugang, ~sammler,
+  "China", "Xinhua", "ZH", "xinhuanet.com", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "China", "People's Daily", "ZH", "people.com.cn", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "China", "China Daily", "EN", "chinadaily.com.cn", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "China", "Global Times", "EN", "globaltimes.cn", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "China", "The Paper", "ZH", "thepaper.cn", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Indonesien", "Kompas", "ID", "kompas.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Indonesien", "Tempo", "ID", "tempo.co", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Indonesien", "Detik", "ID", "detik.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Indonesien", "Antara", "ID", "antaranews.com", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Indonesien", "Republika", "ID", "republika.co.id", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Indonesien", "The Jakarta Post", "EN", "thejakartapost.com", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Bangladesch", "Prothom Alo", "BN", "prothomalo.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Bangladesch", "The Daily Star (Bangladesch)", "EN", "thedailystar.net", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Bangladesch", "Daily Ittefaq", "BN", "ittefaq.com.bd", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Bangladesch", "bdnews24", "EN", "bdnews24.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Bangladesch", "Dhaka Tribune", "EN", "dhakatribune.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Bangladesch", "Jugantor", "BN", "jugantor.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Äthiopien", "Addis Standard", "EN", "addisstandard.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Äthiopien", "The Reporter Ethiopia", "EN", "thereporterethiopia.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Äthiopien", "Ethiopian News Agency", "EN", "ena.et", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Äthiopien", "Fana Broadcasting", "AM", "fanabc.com", "staatlich", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Äthiopien", "Ethiopian Broadcasting Corporation", "AM", "ebc.et", "staatlich", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Mexiko", "La Jornada", "ES", "jornada.com.mx", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Mexiko", "El Universal (Mexiko)", "ES", "eluniversal.com.mx", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Mexiko", "Milenio", "ES", "milenio.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Mexiko", "Excélsior", "ES", "excelsior.com.mx", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Mexiko", "Proceso", "ES", "proceso.com.mx", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Mexiko", "El Financiero", "ES", "elfinanciero.com.mx", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Japan", "Asahi Shimbun", "JA", "asahi.com", "privat", "unklar", "qualitaet", "ja", "scraper", "sitemap",
+  "Japan", "Mainichi Shimbun", "JA", "mainichi.jp", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Japan", "Yomiuri Shimbun", "JA", "yomiuri.co.jp", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Japan", "The Japan Times", "EN", "japantimes.co.jp", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Ägypten", "Al-Ahram", "AR", "ahram.org.eg", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Ägypten", "Al-Masry Al-Youm", "AR", "almasryalyoum.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Ägypten", "Youm7", "AR", "youm7.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Ägypten", "Al-Shorouk", "AR", "shorouknews.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Ägypten", "Ahram Online", "EN", "english.ahram.org.eg", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Ägypten", "Mada Masr", "EN", "madamasr.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Philippinen", "Philippine Daily Inquirer", "EN", "inquirer.net", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Philippinen", "Manila Bulletin", "EN", "mb.com.ph", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Philippinen", "Rappler", "EN", "rappler.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Philippinen", "GMA News", "EN", "gmanetwork.com", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Philippinen", "ABS-CBN News", "EN", "abs-cbn.com", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Vietnam", "VnExpress", "VI", "vnexpress.net", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Vietnam", "Tuoi Tre", "VI", "tuoitre.vn", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Vietnam", "Thanh Nien", "VI", "thanhnien.vn", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Vietnam", "VietnamPlus", "VI", "vietnamplus.vn", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Vietnam", "VOV", "VI", "vov.vn", "staatlich", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Vietnam", "Dan Tri", "VI", "dantri.com.vn", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Türkei", "Hürriyet", "TR", "hurriyet.com.tr", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Türkei", "Sabah", "TR", "sabah.com.tr", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Türkei", "Cumhuriyet", "TR", "cumhuriyet.com.tr", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Türkei", "Sözcü", "TR", "sozcu.com.tr", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Türkei", "Anadolu Ajansı", "TR", "aa.com.tr", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Türkei", "TRT Haber", "TR", "trthaber.com", "staatlich", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Türkei", "Daily Sabah", "EN", "dailysabah.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Türkei", "Hürriyet Daily News", "EN", "hurriyetdailynews.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Thailand", "Thai Rath", "TH", "thairath.co.th", "privat", "unklar", "boulevard", "nein", "scraper", "sitemap",
+  "Thailand", "Matichon", "TH", "matichon.co.th", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Thailand", "Khaosod", "TH", "khaosod.co.th", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Thailand", "Bangkok Post", "EN", "bangkokpost.com", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Thailand", "The Nation Thailand", "EN", "nationthailand.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Thailand", "Daily News (Thailand)", "TH", "dailynews.co.th", "privat", "unklar", "boulevard", "nein", "scraper", "sitemap",
+  "Tansania", "Mwananchi", "SW", "mwananchi.co.tz", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Tansania", "The Citizen (Tansania)", "EN", "thecitizen.co.tz", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Tansania", "Daily News (Tansania)", "EN", "dailynews.co.tz", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Tansania", "HabariLeo", "SW", "habarileo.co.tz", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Tansania", "IPP Media", "EN", "ippmedia.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Kenia", "Daily Nation", "EN", "nation.africa", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Kenia", "The Standard (Kenia)", "EN", "standardmedia.co.ke", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Kenia", "The Star (Kenia)", "EN", "the-star.co.ke", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Kenia", "KBC", "EN", "kbc.co.ke", "oeffentlich-rechtlich", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Kenia", "Citizen Digital", "EN", "citizen.digital", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Myanmar", "The Irrawaddy", "EN", "irrawaddy.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Myanmar", "Myanmar Now", "EN", "myanmar-now.org", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Myanmar", "Frontier Myanmar", "EN", "frontiermyanmar.net", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Myanmar", "Mizzima", "EN", "mizzima.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Myanmar", "Eleven Media", "MY", "elevenmyanmar.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Myanmar", "Global New Light of Myanmar", "EN", "gnlm.com.mm", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Kolumbien", "El Tiempo", "ES", "eltiempo.com", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Kolumbien", "El Espectador", "ES", "elespectador.com", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Kolumbien", "Semana", "ES", "semana.com", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Kolumbien", "El Colombiano", "ES", "elcolombiano.com", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Kolumbien", "Caracol Radio", "ES", "caracol.com.co", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Kolumbien", "Noticias RCN", "ES", "noticiasrcn.com", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Südkorea", "Chosun Ilbo", "KO", "chosun.com", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Südkorea", "JoongAng Ilbo", "KO", "joongang.co.kr", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Südkorea", "Hankyoreh", "KO", "hani.co.kr", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Südkorea", "Dong-A Ilbo", "KO", "donga.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Südkorea", "Yonhap", "KO", "yna.co.kr", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Südkorea", "The Korea Herald", "EN", "koreaherald.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Uganda", "Daily Monitor", "EN", "monitor.co.ug", "privat", "unklar", "qualitaet", "teilweise", "scraper", "sitemap",
+  "Uganda", "Nile Post", "EN", "nilepost.co.ug", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Uganda", "The Observer (Uganda)", "EN", "observer.ug", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Sudan", "Sudan Tribune", "EN", "sudantribune.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Sudan", "Dabanga", "EN", "dabangasudan.org", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Sudan", "Al-Taghyeer", "AR", "altaghyeer.info", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Sudan", "Al-Rakoba", "AR", "alrakoba.net", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Sudan", "SUNA", "AR", "suna-sd.net", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Irak", "Al-Sabah", "AR", "alsabaah.iq", "staatlich", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Irak", "Al-Zaman", "AR", "azzaman.com", "privat", "unklar", "qualitaet", "nein", "scraper", "sitemap",
+  "Irak", "Shafaq News", "AR", "shafaq.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Irak", "Rudaw", "EN", "rudaw.net", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Irak", "Kurdistan24", "EN", "kurdistan24.net", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Irak", "Iraqi News Agency", "AR", "ina.iq", "staatlich", "unklar", "online", "nein", "scraper", "sitemap",
+  "Afghanistan", "TOLOnews", "EN", "tolonews.com", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Afghanistan", "Pajhwok", "EN", "pajhwok.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Afghanistan", "Ariana News", "EN", "ariananews.af", "privat", "unklar", "rundfunk", "nein", "scraper", "sitemap",
+  "Afghanistan", "Khaama Press", "EN", "khaama.com", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Afghanistan", "8am", "FA", "8am.media", "privat", "unklar", "online", "nein", "scraper", "sitemap",
+  "Afghanistan", "Bakhtar News Agency", "EN", "bakhtarnews.af", "staatlich", "unklar", "online", "nein", "scraper", "sitemap"
+)
+
+medien <- bind_rows(mutate(bind_rows(medien, medien_aufstockung, medien_vergleich, medien_gross), region = NA_character_), medien_regional) |>
   left_join(laender, by = "land")
 
 ## ---- zeitraeume ----

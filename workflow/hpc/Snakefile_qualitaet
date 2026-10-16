@@ -1,0 +1,34 @@
+# Snakemake-Workflow, CLUSTER-Teil für den Qualitäts-Classifier (Halbseiten); wird vom lokalen Workflow (workflow/qualitaet/Snakefile) per SSH gestartet
+# und liegt im Cluster-Ordner als "Snakefile_qualitaet". Erwartet qualitaet/<lauf>/auftraege/<art>/auftrag_<art>_<nnn>.jsonl.gz, qualitaet_cluster.py,
+# skripte/qualitaet_titel.py, skripte/qualitaet_halbseite.py, config.yaml und für "score" qualitaet_halbseite.joblib.
+# Umgebung ~/venv-qualitaet: torch, transformers, sentence-transformers, scikit-learn, joblib, numpy (einmalig: snakemake_einrichten.sh qualitaet).
+#   snakemake -s Snakefile_qualitaet --config lauf=q1 arten='[paare]' --executor slurm --jobs 4
+configfile: "config.yaml"
+
+LAUF = config["lauf"]
+ARTEN = config["arten"]
+PAKETE = {a: glob_wildcards(f"qualitaet/{LAUF}/auftraege/{a}/auftrag_{a}_{{nr}}.jsonl.gz").nr for a in ARTEN}
+
+
+rule alle:
+    input:
+        [f"qualitaet/{LAUF}/ergebnisse/{a}/ergebnis_{a}_{nr}.jsonl.gz" for a in ARTEN for nr in PAKETE[a]],
+
+
+rule qualitaet:
+    """Ein Paket auf einer GPU: paare = Vergleichsübersetzung mit Hy-MT2, score = Bewertung mit dem trainierten Modell."""
+    input:
+        "qualitaet/" + LAUF + "/auftraege/{art}/auftrag_{art}_{nr}.jsonl.gz",
+    output:
+        "qualitaet/" + LAUF + "/ergebnisse/{art}/ergebnis_{art}_{nr}.jsonl.gz",
+    resources:
+        slurm_partition=config.get("partition") or config["cluster"]["partition"],
+        runtime=int(config.get("laufzeit_min") or config["cluster"]["laufzeit_min"]),
+        cpus_per_task=config["cluster"]["cpus"],
+        gres=f"gpu:{config['cluster']['gpus']}",
+    log:
+        "logs/" + LAUF + "/qualitaet_{art}_{nr}.log",
+    params:
+        venv=config["cluster"].get("venv_qualitaet", "venv-qualitaet"),
+    shell:
+        "source ~/{params.venv}/bin/activate && python qualitaet_cluster.py {wildcards.art} {input} {output} > {log} 2>&1"

@@ -1,0 +1,124 @@
+# Snakemake-Workflow der Masterarbeit, LOKALER Teil: offene Übersetzungen exportieren, zum Cluster bringen, dort berechnen lassen,
+# Ergebnisse holen und in die Datenbank importieren. Der Cluster-Teil steht in workflow/hpc/Snakefile und läuft auf dem Login-Knoten des
+# bwUniCluster (Slurm). Dokumentation, Graph und Bedienung: workflow/README.md.
+#
+#   snakemake -s workflow/Snakefile -n                 # Trockenlauf: zeigt, was getan würde
+#   snakemake -s workflow/Snakefile --cores 1          # alles für alle Felder (Titel, Lead, Halbseite)
+#   snakemake -s workflow/Snakefile --cores 1 --config felder='[titel]' lauf=test   # nur Titel, eigener Laufname
+#
+# Idempotent: Jeder Schritt hinterlässt eine Marker-Datei unter data/hpc/<lauf>/marker/. Bricht etwas ab, macht ein erneuter Aufruf mit
+# demselben Laufnamen dort weiter. Ein neuer Laufname (Standard: heutiges Datum) exportiert den aktuellen Stand der offenen Aufträge neu.
+# Voraussetzung: Uni-VPN (Cluster-Modus, siehe docs/HPC.md) und Verbindung "ssh uc3"; der Einmalcode wird beim ersten Schritt abgefragt.
+# Bewusst ohne conda und Container: Die Schritte nutzen vorhandene Systemwerkzeuge (python3, rsync, ssh) und die Umgebungen aus README.md bzw. docs/HPC.md.
+from datetime import date
+
+configfile: "workflow/config.yaml"
+
+LAUF = config.get("lauf") or date.today().isoformat()
+FELDER = config["felder"]
+HOST = config["cluster"]["host"]
+REMOTE = config["cluster"]["ordner"]
+SSH = "ssh -o ControlMaster=auto -o ControlPath=$HOME/.ssh/cm-%C -4"   # eine Anmeldung (Einmalcode), danach 10 Minuten offen
+
+
+rule alle:
+    """Ziel: für jedes Feld sind die Cluster-Ergebnisse in der Datenbank (Engine nllb_hpc)."""
+    input:
+        expand(f"data/hpc/{LAUF}/marker/importiert_{{feld}}.ok", feld=FELDER),
+
+
+checkpoint export_auftraege:
+    """Offene Übersetzungsaufträge aus der Datenbank in Pakete schreiben (nur lesend). Wie viele Pakete es gibt, steht erst danach fest."""
+    output:
+        ordner=directory(f"data/hpc/{LAUF}/auftraege/{{feld}}"),
+    params:
+        chunk=config["chunk"],
+        limit=config["limit"],
+    log:
+        f"data/hpc/{LAUF}/logs/export_{{feld}}.log",
+    shell:
+        "python3 skripte/hpc/export_offen.py {wildcards.feld} --ordner {output.ordner} --chunk {params.chunk} --limit {params.limit} > {log} 2>&1"
+
+
+rule hochladen:
+    """Pakete und Cluster-Skripte per rsync auf den Cluster kopieren."""
+    input:
+        ordner=f"data/hpc/{LAUF}/auftraege/{{feld}}",
+    output:
+        marker=touch(f"data/hpc/{LAUF}/marker/hochgeladen_{{feld}}.ok"),
+    params:
+        ssh=SSH, host=HOST, remote=REMOTE, lauf=LAUF,
+    log:
+        f"data/hpc/{LAUF}/logs/hochladen_{{feld}}.log",
+    shell:
+        """
+        {params.ssh} {params.host} 'mkdir -p {params.remote}/auftraege/{params.lauf}/{wildcards.feld} {params.remote}/ergebnisse/{params.lauf}/{wildcards.feld}' > {log} 2>&1
+        rsync -a -e "{params.ssh}" workflow/hpc/Snakefile workflow/config.yaml skripte/hpc/nllb_cluster.py skripte/hpc/snakemake_einrichten.sh {params.host}:{params.remote}/ >> {log} 2>&1
+        rsync -a --delete -e "{params.ssh}" {input.ordner}/ {params.host}:{params.remote}/auftraege/{params.lauf}/{wildcards.feld}/ >> {log} 2>&1
+        """
+
+
+rule cluster_ausfuehren:
+    """Auf dem Cluster den Workflow workflow/hpc/Snakefile starten: je Paket ein Slurm-Job mit GPU. Wartet, bis alle Jobs fertig sind."""
+    input:
+        f"data/hpc/{LAUF}/marker/hochgeladen_{{feld}}.ok",
+    output:
+        marker=touch(f"data/hpc/{LAUF}/marker/berechnet_{{feld}}.ok"),
+    params:
+        venv=config["cluster"]["snakemake_venv"], ssh=SSH, host=HOST, remote=REMOTE, lauf=LAUF,
+        # Aufruf-Überschreibung, z. B. --config partition=dev_gpu_h100 laufzeit_min=30 (nur für Tests)
+        extra="".join(f" {k}={config[k]}" for k in ("partition", "laufzeit_min") if config.get(k)),
+    log:
+        f"data/hpc/{LAUF}/logs/cluster_{{feld}}.log",
+    shell:
+        """
+        {params.ssh} {params.host} 'cd {params.remote} && source ~/{params.venv}/bin/activate && \
+          snakemake -s Snakefile --configfile config.yaml --config lauf={params.lauf}{params.extra} felder="[{wildcards.feld}]" \
+          --executor slurm --jobs 4 --latency-wait 60 --rerun-incomplete' > {log} 2>&1
+        """
+
+
+rule herunterladen:
+    """Ergebnisdateien vom Cluster holen."""
+    input:
+        f"data/hpc/{LAUF}/marker/berechnet_{{feld}}.ok",
+    output:
+        marker=touch(f"data/hpc/{LAUF}/marker/heruntergeladen_{{feld}}.ok"),
+    params:
+        ssh=SSH, host=HOST, remote=REMOTE, lauf=LAUF,
+        ziel=f"data/hpc/{LAUF}/ergebnisse/{{feld}}",
+    log:
+        f"data/hpc/{LAUF}/logs/herunterladen_{{feld}}.log",
+    shell:
+        """
+        mkdir -p {params.ziel}
+        rsync -a -e "{params.ssh}" {params.host}:{params.remote}/ergebnisse/{params.lauf}/{wildcards.feld}/ {params.ziel}/ > {log} 2>&1
+        """
+
+
+rule importieren:
+    """Ergebnisse in die Tabelle uebersetzung schreiben (Engine nllb_hpc; INSERT OR IGNORE, nichts wird überschrieben)."""
+    input:
+        f"data/hpc/{LAUF}/marker/heruntergeladen_{{feld}}.ok",
+    output:
+        marker=touch(f"data/hpc/{LAUF}/marker/importiert_{{feld}}.ok"),
+    params:
+        ordner=f"data/hpc/{LAUF}/ergebnisse/{{feld}}",
+    log:
+        f"data/hpc/{LAUF}/logs/import_{{feld}}.log",
+    shell:
+        """
+        for f in {params.ordner}/ergebnis_*.jsonl.gz; do
+          [ -e "$f" ] && python3 skripte/hpc/import_ergebnis.py {wildcards.feld} "$f"
+        done > {log} 2>&1 || true
+        """
+
+
+rule korpus:
+    """Analysekorpus als eingefrorene Datei exportieren (R/50_korpus.R-Auswahl, mit Qualitätsmarken); getrennt aufrufbar: snakemake -s workflow/Snakefile --cores 1 korpus"""
+    output:
+        f"data/korpus_export/korpus_{LAUF}.csv.gz",
+    log:
+        f"data/hpc/{LAUF}/logs/korpus.log",
+    shell:
+        "python3 skripte/korpus_export.py --aus {output} > {log} 2>&1"

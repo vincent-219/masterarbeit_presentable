@@ -1,0 +1,106 @@
+# Snakemake-Workflow, LOKALER Teil für den Qualitäts-Classifier (Halbseiten): Aufträge exportieren, zum Cluster bringen, dort rechnen lassen,
+# Ergebnisse holen und übernehmen. Gleicher Aufbau wie workflow/Snakefile; Cluster-Teil: workflow/hpc/Snakefile_qualitaet. Doku: workflow/README.md.
+#   snakemake -s workflow/qualitaet/Snakefile --cores 1 --config lauf=q1 arten='[paare]'          # Vergleichsübersetzungen mit Hy-MT2
+#   snakemake -s workflow/qualitaet/Snakefile --cores 1 --config lauf=q1 arten='[score]'          # alle Halbseiten bewerten
+#   snakemake -s workflow/qualitaet/Snakefile --cores 1 --config lauf=q1 arten='[rueck]'          # Sprachen ohne Hy-MT2: NLLB-Rückübersetzung
+# Reihenfolge im Alltag: paare (und rueck) -> (lokal) python3 skripte/qualitaet_halbseite.py train -> score. Das Training bleibt lokal (wenige Minuten, CPU).
+from datetime import date
+
+configfile: "workflow/config.yaml"
+
+LAUF = config.get("lauf") or date.today().isoformat()
+ARTEN = config.get("arten", ["score"])
+HOST = config["cluster"]["host"]
+REMOTE = config["cluster"]["ordner"]
+SSH = "ssh -o ControlMaster=auto -o ControlPath=$HOME/.ssh/cm-%C -4"
+QL = f"data/hpc/{LAUF}/qualitaet"
+
+
+rule alle:
+    input:
+        expand(f"{QL}/marker/importiert_{{art}}.ok", art=ARTEN),
+
+
+checkpoint export_qualitaet:
+    """Aufträge aus der Datenbank in Pakete schreiben (nur lesend)."""
+    output:
+        ordner=directory(f"{QL}/auftraege/{{art}}"),
+    params:
+        extra=lambda w: "--n " + str(config.get("n", 150)) + (" --sprachen " + config["sprachen"] if config.get("sprachen") else "") if w.art in ("paare", "rueck") else "--chunk 10000" + (" --alle" if config.get("alle") else ""),
+    log:
+        f"{QL}/logs/export_{{art}}.log",
+    shell:
+        "python3 skripte/hpc/export_qualitaet.py {wildcards.art} --ordner {output.ordner} {params.extra} > {log} 2>&1"
+
+
+rule hochladen:
+    """Pakete, Cluster-Skripte, die beiden Classifier-Module und (für score) das trainierte Modell auf den Cluster kopieren."""
+    input:
+        ordner=f"{QL}/auftraege/{{art}}",
+    output:
+        marker=touch(f"{QL}/marker/hochgeladen_{{art}}.ok"),
+    params:
+        ssh=SSH, host=HOST, remote=REMOTE, lauf=LAUF,
+    log:
+        f"{QL}/logs/hochladen_{{art}}.log",
+    shell:
+        """
+        {params.ssh} {params.host} 'mkdir -p {params.remote}/skripte {params.remote}/qualitaet/{params.lauf}/auftraege/{wildcards.art} {params.remote}/qualitaet/{params.lauf}/ergebnisse/{wildcards.art}' > {log} 2>&1
+        rsync -a -e "{params.ssh}" workflow/hpc/Snakefile_qualitaet workflow/config.yaml skripte/hpc/qualitaet_cluster.py skripte/hpc/nllb_cluster.py skripte/hpc/qualitaet_einrichten.sh {params.host}:{params.remote}/ >> {log} 2>&1
+        rsync -a -e "{params.ssh}" skripte/qualitaet_titel.py skripte/qualitaet_halbseite.py {params.host}:{params.remote}/skripte/ >> {log} 2>&1
+        [ "{wildcards.art}" = "score" ] && rsync -a -e "{params.ssh}" data/qualitaet_halbseite.joblib {params.host}:{params.remote}/qualitaet_halbseite.joblib >> {log} 2>&1 || true
+        rsync -a --delete -e "{params.ssh}" {input.ordner}/ {params.host}:{params.remote}/qualitaet/{params.lauf}/auftraege/{wildcards.art}/ >> {log} 2>&1
+        """
+
+
+rule cluster_ausfuehren:
+    """Auf dem Login-Knoten den Cluster-Workflow starten (je Paket ein Slurm-Job mit GPU) und auf die Jobs warten."""
+    input:
+        f"{QL}/marker/hochgeladen_{{art}}.ok",
+    output:
+        marker=touch(f"{QL}/marker/berechnet_{{art}}.ok"),
+    params:
+        venv=config["cluster"]["snakemake_venv"], ssh=SSH, host=HOST, remote=REMOTE, lauf=LAUF,
+        extra="".join(f" {k}={config[k]}" for k in ("partition", "laufzeit_min") if config.get(k)),
+    log:
+        f"{QL}/logs/cluster_{{art}}.log",
+    shell:
+        """
+        {params.ssh} {params.host} 'cd {params.remote} && source ~/{params.venv}/bin/activate && \
+          snakemake -s Snakefile_qualitaet --configfile config.yaml --config lauf={params.lauf}{params.extra} arten="[{wildcards.art}]" \
+          --executor slurm --jobs 4 --latency-wait 60 --rerun-incomplete' > {log} 2>&1
+        """
+
+
+rule herunterladen:
+    input:
+        f"{QL}/marker/berechnet_{{art}}.ok",
+    output:
+        marker=touch(f"{QL}/marker/heruntergeladen_{{art}}.ok"),
+    params:
+        ssh=SSH, host=HOST, remote=REMOTE, lauf=LAUF, ziel=f"{QL}/ergebnisse/{{art}}",
+    log:
+        f"{QL}/logs/herunterladen_{{art}}.log",
+    shell:
+        """
+        mkdir -p {params.ziel}
+        rsync -a -e "{params.ssh}" {params.host}:{params.remote}/qualitaet/{params.lauf}/ergebnisse/{wildcards.art}/ {params.ziel}/ > {log} 2>&1
+        """
+
+
+rule importieren:
+    """Paare an data/qualitaet_halbseiten_paare.jsonl anhängen bzw. Bewertungen in data/qualitaet_halbseite.csv zusammenführen."""
+    input:
+        f"{QL}/marker/heruntergeladen_{{art}}.ok",
+    output:
+        marker=touch(f"{QL}/marker/importiert_{{art}}.ok"),
+    params:
+        ordner=f"{QL}/ergebnisse/{{art}}",
+    log:
+        f"{QL}/logs/import_{{art}}.log",
+    shell:
+        """
+        for f in {params.ordner}/ergebnis_*.jsonl.gz; do
+          [ -e "$f" ] && python3 skripte/hpc/import_qualitaet.py {wildcards.art} "$f"
+        done > {log} 2>&1 || true
+        """

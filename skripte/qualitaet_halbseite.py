@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # AKTION: Qualitätsbewertung der NLLB-Halbseiten-Übersetzungen (lesend gegenüber der Datenbank, keine Cloud).
-#   paare [--n 150]  Stichprobe je Sprache (nur Sprachen, die Hy-MT2 kann) erneut mit Hy-MT2 übersetzen (in Chunks von höchstens
+#   paare [--n 150]  (auf dem Cluster auch: Rückübersetzung, siehe skripte/hpc/qualitaet_cluster.py)  Stichprobe je Sprache (nur Sprachen, die Hy-MT2 kann) erneut mit Hy-MT2 übersetzen (in Chunks von höchstens
 #                    ~400 Zeichen) -> data/qualitaet_halbseiten_paare.jsonl. GPU nötig, Übersetzer-Dienst vorher anhalten.
 #   train            Merkmale (nur aus Original und NLLB-Fassung) + Label "gut" = NLLB stimmt mit Hy-MT2 überein -> Modell.
 #   score            alle relevanten Nicht-EN-Halbseiten bewerten -> data/qualitaet_halbseite.csv (artikel_id, score, gut, ...)
@@ -20,15 +20,40 @@ sys.path.insert(0, os.path.join(PROJEKT, "skripte"))
 from qualitaet_titel import SPRACHEN, chrf, ENG, ZIFFERN, GROSS, WORT, MODELL_EMB   # gleiche Hilfen wie bei den Titeln
 
 HYMT = "/mnt/daten/hf-modelle/Hy-MT2-1.8B"
+SPRACHEN_BASIS = list(SPRACHEN)   # die zehn Sprachen des ersten Trainings; train() erweitert die Liste um alle Sprachen in den Paaren
 NAMEN = {"DE": "German", "IT": "Italian", "ES": "Spanish", "FR": "French", "PT": "Portuguese", "PL": "Polish",
          "CS": "Czech", "NL": "Dutch", "RU": "Russian", "TR": "Turkish"}
 PAARE = "data/qualitaet_halbseiten_paare.jsonl"
 MODELL_DATEI = "data/qualitaet_halbseite.joblib"
-SATZ = re.compile(r"(?<=[.!?…؟。])\s+(?=[\"'“„«(\[]?\w)")
+SATZ = re.compile(r"(?<=[.!?…])\s+(?=[\"'“„«(\[]?[\w])")
+# ohne Leerzeichen-Bedingung: Chinesisch/Japanisch (。！？), Hindi/Bengali (।), Urdu (۔), Arabisch (؟), Amharisch (።), Birmanisch (။)
+ASIEN = re.compile(r"([。！？।۔؟።။]+[」』”’\"')）]*)\s*")
+
+
+def lange_teilen(x, max_zeichen=300):
+    """Stücke ohne Satzzeichen (Thai, Birmanisch) an Leerzeichen auf höchstens max_zeichen teilen, sonst hart schneiden"""
+    if len(x) <= max_zeichen:
+        return [x]
+    out, akt = [], ""
+    for w in re.split(r"(?<=\s)", x):
+        while len(w) > max_zeichen:
+            if akt:
+                out.append(akt); akt = ""
+            out.append(w[:max_zeichen]); w = w[max_zeichen:]
+        if akt and len(akt) + len(w) > max_zeichen:
+            out.append(akt); akt = w
+        else:
+            akt += w
+    return out + [akt] if akt else out
 
 
 def saetze(text):
-    return [s.strip() for s in SATZ.split(text.replace("\n", " ")) if len(s.strip()) > 2]
+    out = []
+    for a in re.split(r"\n+", text or ""):
+        a = ASIEN.sub(lambda m: m.group(1) + "\n", re.sub(r"\s+", " ", a).strip())
+        for b in a.split("\n"):
+            out += [x.strip() for x in SATZ.split(b.strip()) if len(x.strip()) > 2]
+    return [k for s in out for k in lange_teilen(s)]
 
 
 def chunks(text, max_zeichen=400):
@@ -123,6 +148,13 @@ def label_und_x(z):
     y = []
     for x, a, b in zip(z, ea, eb):
         sim = a @ b.T if len(a) and len(b) else np.zeros((1, 1))
+        if x.get("b_typ") == "rueck":
+            # Rückübersetzung (Sprachen ohne Hy-MT2): b = NLLB-Rückübersetzung der englischen Fassung in die Originalsprache; verglichen wird mit dem
+            # ORIGINAL (gleiche Sprache): Satz-Embeddings und chrF, mit etwas niedrigerer chrF-Schwelle (Rückübersetzungen sind freier)
+            so = einbetten(saetze(x["original"])); sr = einbetten(saetze(x["b"]))
+            sim = so @ sr.T if len(so) and len(sr) else np.zeros((1, 1))
+            y.append(int((sim.max(1).mean() >= 0.80 and sim.max(0).mean() >= 0.80) or chrf(x["b"], x["original"]) >= 35))
+            continue
         y.append(int((sim.max(1).mean() >= 0.80 and sim.max(0).mean() >= 0.80) or chrf(x["a"], x["b"]) >= 45))
     return X, np.array(y), np.array(sp)
 
@@ -132,7 +164,9 @@ def train():
     from sklearn.metrics import roc_auc_score
     from sklearn.model_selection import StratifiedKFold, cross_val_predict
     import joblib
+    global SPRACHEN
     z = [json.loads(l) for l in open(PAARE, encoding="utf-8")]
+    SPRACHEN = SPRACHEN_BASIS + sorted({x["sprache"] for x in z} - set(SPRACHEN_BASIS))   # Sprachen aus den Daten (auch ohne Hy-MT2)
     X, y, sp = label_und_x(z)
     modell = HistGradientBoostingClassifier(max_depth=3, learning_rate=0.06, max_iter=150, random_state=1)
     p = cross_val_predict(modell, X, y, cv=StratifiedKFold(5, shuffle=True, random_state=1), method="predict_proba")[:, 1]
@@ -144,7 +178,7 @@ def train():
         if rec >= 0.70 and schwelle == 0.5:
             schwelle = float(round(t, 2))
     ok = p >= schwelle
-    modell.fit(X, y); joblib.dump({"modell": modell, "schwelle": schwelle}, MODELL_DATEI)
+    modell.fit(X, y); joblib.dump({"modell": modell, "schwelle": schwelle, "sprachen": SPRACHEN}, MODELL_DATEI)
     erg = {"stand": datetime.now().strftime("%Y-%m-%d %H:%M"), "n": len(z), "gut_anteil": round(float(y.mean()), 3), "schlechte": int(schlecht.sum()),
            "auc_kreuzvalidiert": round(float(roc_auc_score(y, p)), 3) if len(set(y)) > 1 else None,
            "auc_nur_abdeckung": round(float(roc_auc_score(y, X[:, 0])), 3) if len(set(y)) > 1 else None,
@@ -159,7 +193,9 @@ def train():
 
 def score():
     import joblib
+    global SPRACHEN
     d = joblib.load(MODELL_DATEI)
+    SPRACHEN = d.get("sprachen", SPRACHEN)   # Sprachen, mit denen das Modell trainiert wurde
     con = sqlite3.connect("file:data/korpus.sqlite?mode=ro", uri=True, timeout=60)
     zeilen = con.execute("""select a.id, a.sprache, a.halbseite_original, u.text_en from artikel a join uebersetzung u
         on u.artikel_id = a.id and u.feld = 'halbseite' and u.engine = 'nllb'
