@@ -537,7 +537,10 @@ LAND_EN = {"Deutschland": "Germany", "Österreich": "Austria", "Vereinigtes Kön
            "Nordmazedonien": "North Macedonia", "Algerien": "Algeria", "Marokko": "Morocco", "Tunesien": "Tunisia",
            "Libanon": "Lebanon", "Elfenbeinküste": "Côte d'Ivoire", "Indien": "India", "Südafrika": "South Africa",
            "Brasilien": "Brazil", "Argentinien": "Argentina", "Mosambik": "Mozambique",
-           "Demokratische Republik Kongo": "DR Congo", "Ruanda": "Rwanda", "Vereinigte Staaten": "United States", "Russland": "Russia"}
+           "Demokratische Republik Kongo": "DR Congo", "Ruanda": "Rwanda", "Vereinigte Staaten": "United States", "Russland": "Russia",
+           "Indonesien": "Indonesia", "Bangladesch": "Bangladesh", "Äthiopien": "Ethiopia", "Mexiko": "Mexico", "Ägypten": "Egypt",
+           "Philippinen": "Philippines", "Türkei": "Turkey", "Tansania": "Tanzania", "Kenia": "Kenya", "Kolumbien": "Colombia",
+           "Südkorea": "South Korea", "Irak": "Iraq"}
 GRUPPE_EN = {"Nordirland": "Northern Ireland", "Schottland": "Scotland", "Katalonien": "Catalonia", "Baskenland": "Basque Country",
              "Galicien": "Galicia", "Südtirol": "South Tyrol", "deutschsprachig": "German-speaking",
              "türkisch-zyprisch": "Turkish Cypriot", "russischsprachig": "Russian-speaking", "polnischsprachig": "Polish-speaking",
@@ -741,7 +744,7 @@ def dendrogramm(c):
     return "".join(o)
 
 
-def forest(eintraege):
+def forest_py(eintraege):
     """eintraege: [(label, or, lo, hi, p, tooltip)] -> Odds Ratios mit 95-%-KI, log-Skala"""
     ok = [e for e in eintraege if e[1] is not None]
     if not ok:
@@ -769,7 +772,7 @@ def forest(eintraege):
     return "".join(o)
 
 
-def ame_forest(eintraege):
+def ame_forest_py(eintraege):
     """eintraege: [(label, ame, lo, hi, p, tooltip)] in Prozentpunkten -> Punktschätzer mit 95-%-KI, lineare Skala um 0"""
     ok = [e for e in eintraege if e[1] is not None]
     if not ok:
@@ -811,6 +814,40 @@ def ame_eintraege(lg):
         else:
             eintr.append((name, a, lo, hi, p, f'{name}: AME {a:+.2f} percentage points [{lo:+.2f}; {hi:+.2f}], p = {p:.3f}'))
     return eintr
+
+
+# Forest-Plots: ggplot (skripte/live_forest.R) statt Python-SVG; die Python-Fassung bleibt als Platzhalter/Rueckfall im Marker stehen
+FOREST_REG = {}
+def _forest_marker(art, eintraege, fallback):
+    ok = [e for e in eintraege if e[1] is not None]
+    if not ok:
+        return fallback
+    import hashlib
+    k = hashlib.md5(json.dumps([art] + [[e[0], round(e[1], 4), round(e[2], 4), round(e[3], 4), round(e[4], 4)] for e in ok]).encode()).hexdigest()[:12]
+    FOREST_REG[k] = {"art": art, "d": [[e[0], e[1], e[2], e[3], e[4]] for e in ok]}
+    return f'<!--GGF:{k}-->{fallback}<!--/GGF-->'
+def forest(eintraege):
+    return _forest_marker("or", eintraege, forest_py(eintraege))
+def ame_forest(eintraege):
+    return _forest_marker("ame", eintraege, ame_forest_py(eintraege))
+def forest_ersetzen(seite):
+    """rendert fehlende Forest-Plots in einem R-Aufruf und ersetzt die Marker durch hell/dunkel-Bilder"""
+    ordner = os.path.join(GG_ORDNER, "forest"); os.makedirs(ordner, exist_ok=True)
+    fehlt = {k: v for k, v in FOREST_REG.items() if not os.path.exists(os.path.join(ordner, f"{k}_dunkel.svg"))}
+    if fehlt:
+        try:
+            ein = os.path.join(ordner, "eingabe.json")
+            with open(ein, "w", encoding="utf-8") as fh:
+                json.dump(fehlt, fh)
+            subprocess.run(["nice", "-n", "10", "Rscript", "skripte/live_forest.R", ein], timeout=600, capture_output=True)
+        except Exception:
+            pass
+    def ers(m):
+        k = m.group(1)
+        if not all(os.path.exists(os.path.join(ordner, f"{k}_{modus}.svg")) for modus in ("hell", "dunkel")):
+            return m.group(2)
+        return "".join(f'<div class="gg gg-{modus}"><img src="grafiken/forest/{k}_{modus}.svg" loading="lazy" alt="Forest plot"></div>' for modus in ("hell", "dunkel"))
+    return re.sub(r"<!--GGF:(\w+)-->(.*?)<!--/GGF-->", ers, seite, flags=re.S)
 
 
 def effekt(or_html, lg):
@@ -1099,6 +1136,18 @@ def methoden_html():
         icc_g = [(SCHLUESSEL_NAME.get(e["frame"], e["frame"]), 100 * e["icc_gruppe"], f'{SCHLUESSEL_NAME.get(e["frame"], e["frame"])}: '
                   f'{100 * e["icc_gruppe"]:.1f} % of the latent variance lies between sub-national groups within countries (full model)')
                  for e in mm if e.get("icc_gruppe") is not None]
+        paare = [e for e in mm if isinstance(e.get("ohne_gruppe"), dict) and not e["ohne_gruppe"].get("fehler")]
+        og = [dict(e, **e["ohne_gruppe"]) for e in paare]
+        og_block = ""
+        if og:
+            zeilen = "".join(
+                f'<tr><td>{E(SCHLUESSEL_NAME.get(e["frame"], e["frame"]))}</td><td>{e["or"]:.2f} / {e["ohne_gruppe"]["or"]:.2f}</td>'
+                f'<td>{e["aic"]:.0f} / {e["ohne_gruppe"]["aic"]:.0f}</td>'
+                f'<td>{e["ohne_gruppe"].get("lr_gruppe_p", float("nan")):.3f}</td></tr>' for e in paare if e.get("or") is not None and e.get("aic") is not None)
+            og_block = ('<h3>Same model without the group level, (1 | country) only</h3><p class="klein">Check of the third level: odds ratios '
+                        'and AIC with / without (1 | country:group). The last column is the likelihood-ratio test for the group level '
+                        '(small p = the group level improves the model).</p>' + effekt(forest(logit_eintraege(og)), og) +
+                        '<table><tr><th>Frame</th><th>OR with / without</th><th>AIC with / without</th><th>LR test group level, p</th></tr>' + zeilen + '</table>')
         return (f'<h3>Multilevel model (countries and sub-national groups)</h3><p>As in the tutorial (ch. 16), with a third level: '
                 f'glmer(frame ~ {E(var_text)} + (1 | country) + (1 | country:group)). Articles are nested in groups (nationwide outlets; '
                 f'regional and minority outlets such as Scotland, Catalonia or Russian speakers in Latvia; in the UK the nationwide group '
@@ -1108,7 +1157,7 @@ def methoden_html():
                 f'<h3>ICC: share of variance between countries</h3>{hbars(icc, fmt=lambda v: f"{v:.0f} %", max_wert=100, bw=260)}'
                 + (f'<h3>Share of variance between groups within countries</h3>{hbars(icc_g, fmt=lambda v: f"{v:.1f} %", bw=260)}' if icc_g else '') +
                 f'<p class="klein">Fast approximation (nAGQ = 0); checked against the more exact Laplace estimate, differences in '
-                f'the second decimal place.</p>')
+                f'the second decimal place.</p>' + og_block)
 
     def angepasst_block():
         """Hauptmodell nach der Regressionsdiagnostik: Gruppen ohne Treffer entfernt, KI nach Medium geclustert"""
@@ -1732,7 +1781,7 @@ def pew_html():
 
 # ---- Medien im Vergleich (innerhalb eines Landes) und Medienauswahl ----
 SPEKTRUM = ["links", "mitte-links", "mitte", "mitte-rechts", "rechts", "unklar"]
-# Begründung je Land aus dem Untersuchungsdesign (Stand 04.10.2026)
+# Begründung je Land aus dem Untersuchungsdesign (claude.ai-Dokument "Masterarbeit – Untersuchungsdesign", Stand 04.10.2026)
 KERN_VORSCHLAG = {"Deutschland": "tagesschau, taz, SZ, FAZ, Welt/Bild", "Vereinigtes Königreich": "BBC, Guardian, Telegraph, Daily Mail",
                   "Irland": "RTÉ, Irish Times, Irish Independent", "Frankreich": "Le Monde, Libération, Le Figaro, franceinfo",
                   "Italien": "Repubblica, Corriere della Sera, Il Fatto Quotidiano, Il Giornale",
@@ -1805,7 +1854,7 @@ for land in medienvergleich:
                                               SPEKTRUM.index(x["ausrichtung"]) if x["ausrichtung"] in SPEKTRUM else 9, x["medium"]))
 
 # ---- Links zum Code je Analyseschritt (GitHub mit Zeilensprung, dazu die lokale Datei) ----
-GITHUB = "https://github.com/vincent-219/Masterarbeit_Nahost_Presentable/blob/main/"
+GITHUB = "https://github.com/vincent-219/masterarbeit-nahost/blob/main/"
 PROJEKT = os.getcwd()
 def zeile(datei, muster):
     try:
@@ -1828,6 +1877,7 @@ CODE = {
     "Pipeline right now": [("Live server", "skripte/live_server.py", None), ("Panel", "skripte/dashboard_js/live.js", None)],
     "Translation cross-check (second model)": [("Display", "skripte/live_dashboard.py", "def crosscheck_html")],
     "Translation quality classifier": [("Titles", "skripte/qualitaet_titel.py", None), ("Half pages", "skripte/qualitaet_halbseite.py", None), ("Display", "skripte/live_dashboard.py", "def qualitaet_html")],
+    "Workflow (Snakemake)": [("Local", "workflow/Snakefile", None), ("Cluster", "workflow/hpc/Snakefile", None), ("Diagram", "workflow/schaubild.py", None), ("Display", "skripte/live_dashboard.py", "def workflow_html")],
     "Retrieval by country": [("Retrieval", "R/16_alle_medien.R", "## ---- medium-volltexte ----"), ("Fetching pages", "R/15_volltext.R", "## ---- volltext-holen ----")],
     "Pace": [("Time series", "skripte/live_dashboard.py", "# ---- 3. Verlauf")],
     "Articles per day": [("Counting", "skripte/live_dashboard.py", "# 4b Artikel je Tag")],
@@ -1929,6 +1979,89 @@ def js_json(x):
 
 KARTE_JS = open("skripte/dashboard_js/karte.js", encoding="utf-8").read()
 LIVE_JS = open("skripte/dashboard_js/live.js", encoding="utf-8").read()
+
+
+WF_JS = """<style>
+.wfsvg g.bs:hover rect{stroke-width:3} .wfsvg g.bs.aktiv rect{stroke-width:3.5;fill:rgba(168,85,247,.10)}
+.wfdetail{margin-top:10px;padding:10px 14px;border:1px solid #8b949e55;border-radius:8px}
+.wfdetail pre{max-height:340px;overflow:auto;background:#0d1117;color:#e6edf3;padding:10px;border-radius:6px;font-size:12px}
+.wfzurueck{cursor:pointer;margin-left:10px;font-size:12px}
+</style>
+<script>(function(){
+ var box=document.getElementById('wfbox'); if(!box) return;
+ function vb(svg){return svg.getAttribute('viewBox').split(/\\s+/).map(Number);}
+ function anim(svg,ziel){var a=vb(svg),t0=null;function f(t){if(!t0)t0=t;var k=Math.min((t-t0)/350,1),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+   svg.setAttribute('viewBox',a.map(function(v,i){return v+(ziel[i]-v)*e;}).join(' '));if(k<1)requestAnimationFrame(f);}requestAnimationFrame(f);}
+ box.querySelectorAll('svg.wfsvg').forEach(function(svg){svg.dataset.vb0=svg.getAttribute('viewBox');});
+ function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+ function zurueck(){box.querySelectorAll('svg.wfsvg').forEach(function(o){anim(o,o.dataset.vb0.split(' ').map(Number));});
+   box.querySelectorAll('g.bs.aktiv').forEach(function(x){x.classList.remove('aktiv');});
+   document.getElementById('wfdetail').innerHTML='<p class="leer">Click a block to zoom in and see its code.</p>';}
+ box.addEventListener('click',function(ev){
+  var g=ev.target.closest('g.bs'), svg=ev.target.closest('svg.wfsvg');
+  if(!g||!svg) return;
+  if(g.classList.contains('aktiv')){zurueck(); return;}
+  box.querySelectorAll('g.bs.aktiv').forEach(function(x){x.classList.remove('aktiv');}); g.classList.add('aktiv');
+  box.querySelectorAll('svg.wfsvg').forEach(function(o){if(o!==svg) anim(o,o.dataset.vb0.split(' ').map(Number));});
+  var b=g.getBBox(); anim(svg,[b.x-70,b.y-40,b.width+140,(b.width+140)*vb(svg)[3]/vb(svg)[2]]);
+  var d=window.WFD[g.dataset.k]; if(!d) return;
+  var h='<b>'+esc(d.titel)+'</b> <a class="wfzurueck" id="wfzu">zoom out</a><p>'+esc(d.text)+'</p>';
+  if(d.code) h+='<pre>'+esc(d.code)+'</pre>';
+  h+='<a href="'+window.WFGH+d.datei+'" target="_blank">'+esc(d.datei)+' on GitHub ↗</a>';
+  var p=document.getElementById('wfdetail'); p.innerHTML=h;
+  document.getElementById('wfzu').onclick=zurueck;
+ });
+})();</script>"""
+
+
+
+def schaubild_svg():
+    """dunkles Ablaufschaubild mit Zustand des letzten Laufs (workflow/schaubild.py)"""
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("schaubild", os.path.join(PROJEKT, "workflow", "schaubild.py"))
+        m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+        dj = json.dumps(m.details(), ensure_ascii=False).replace("</", "<\\/")
+        return ('<div id="wfbox">' + '<h3>Pipeline stages: the dependencies, one after another</h3><p class="sub">Path of one article; each stage needs the result of the one before. ''In operation the stages run at the same time on different articles.</p>' + m.gesamt_svg() + '<div id="wfdetail" class="wfdetail"><p class="leer">Click a block to zoom in and see its code.</p></div><h3>Snakemake graph: the batch part (translation and quality classifier)</h3><p class="sub">Nodes are rules, arrows are dependencies. The top row is the translation, ''the lower two rows are the quality classifier, which needs more steps: first the Hy-MT2 comparison pairs (part 1), then training on the PC and finally scoring with the trained model (part 2). ''Rows without an arrow between them run independently and at the same time.</p>' + m.netz_svg() + '<h3>Last Snakemake run</h3>' + m.svg_bauen() + '</div>'
+                f'<script>window.WFD = {dj}; window.WFGH = {json.dumps(GITHUB)};</script>' + WF_JS)
+    except Exception as ex:
+        return f'<p class="leer">Workflow diagram not available ({E(str(ex))}).</p>'
+
+
+def workflow_html():
+    """Snakemake-Workflow (workflow/Snakefile, workflow/hpc/Snakefile) als Grafik mit Erklärung; statisch, ohne externe Bibliotheken"""
+    kasten = [  # (x, y, Titel, Zeile 2, Farbe)
+        (10, 30, "export_auftraege", "open items to packages", "pc"), (190, 30, "hochladen", "rsync to cluster", "pc"),
+        (370, 30, "cluster_ausfuehren", "starts Slurm workflow", "pc"), (550, 30, "herunterladen", "fetch results", "pc"),
+        (730, 30, "importieren", "engine nllb_hpc", "pc"),
+        (370, 130, "uebersetzen (xN)", "1 Slurm job / package, 1 GPU", "hpc"),
+        (730, 130, "korpus", "frozen corpus export", "pc")]
+    sv = ['<svg viewBox="0 0 920 210" style="width:100%;max-width:920px;font:12px sans-serif">',
+          '<defs><marker id="wp" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="#888"/></marker></defs>']
+    for a, b in ((0, 1), (1, 2), (2, 3), (3, 4)):
+        sv.append(f'<line x1="{kasten[a][0] + 160}" y1="{kasten[a][1] + 22}" x2="{kasten[b][0]}" y2="{kasten[b][1] + 22}" stroke="#888" marker-end="url(#wp)"/>')
+    sv.append('<line x1="450" y1="74" x2="450" y2="130" stroke="#888" stroke-dasharray="4 3" marker-end="url(#wp)"/>')
+    sv.append('<line x1="810" y1="74" x2="810" y2="130" stroke="#888" marker-end="url(#wp)"/>')
+    for x, y, t, u, art in kasten:
+        f = "#dbeafe" if art == "pc" else "#fde68a"
+        sv.append(f'<rect x="{x}" y="{y}" width="160" height="44" rx="6" fill="{f}" stroke="#555"/>'
+                  f'<text x="{x + 80}" y="{y + 19}" text-anchor="middle" font-weight="bold" fill="#111">{E(t)}</text>'
+                  f'<text x="{x + 80}" y="{y + 35}" text-anchor="middle" fill="#333">{E(u)}</text>')
+    sv.append('<rect x="10" y="190" width="14" height="10" fill="#dbeafe" stroke="#555"/><text x="30" y="199" fill="currentColor">own PC (workflow/Snakefile)</text>'
+              '<rect x="230" y="190" width="14" height="10" fill="#fde68a" stroke="#555"/><text x="250" y="199" fill="currentColor">bwUniCluster (workflow/hpc/Snakefile)</text></svg>')
+    return ('<p><b>Only this part is a graph:</b> the batch section handled by Snakemake (translation and quality scoring on the cluster, steps 5 and 6 of the overview). '
+            'Mathematically it is a directed acyclic graph: every step is a node with its inputs and outputs, the arrows are the dependencies, '
+            'and Snakemake derives the order, the parallel jobs (one per package) and what has to be re-run from it. '
+            'The rest of the pipeline (collecting, import, relevance, analysis) runs as always-on services and loops and is <i>not</i> modelled as a graph. '
+            'Click a node or block to zoom in and see its code (click again to zoom out).</p>'
+            '<p>Bulk translation and scoring run as a <b>Snakemake workflow</b>: every step declares its inputs and outputs, so the run is reproducible, '
+            'resumable (finished steps are skipped) and parallel on the cluster (one GPU job per package). '
+            'It complements the always-on services (scraper, importer, local translator), it does not replace them.</p>'
+            + schaubild_svg() +
+            '<ul><li><b>Why not the scraper:</b> its bottleneck is request pacing and the Media Cloud quota, not dependencies.</li>'
+            '<li><b>Local translator stays</b> for the continuous trickle of new articles; Snakemake is for large batches (new countries, re-runs).</li>'
+            '<li><b>Results</b> enter as engine <code>nllb_hpc</code> and are not used in the analysis until validated against the local <code>nllb</code> translation.</li>'
+            '<li><b>Start:</b> <code>snakemake -s workflow/Snakefile --cores 1 --config lauf=NAME</code> (needs an open SSH master, one OTP per 12 h). Live job state: stage 8 above.</li></ul>')
 
 
 def qualitaet_html():
@@ -2175,7 +2308,7 @@ Rough live analysis during scraping, import and translation – not final.</p>
 
 <h2 class="block" id="g-daten">Map and data collection</h2>
 <section><h2>World map</h2><p>Choose an indicator and an area; countries without enough data are grey, countries planned for the sample are tinted orange (counted as 0 until their outlets are collected).</p>
-<div class="kartenkopf"><label>Area <select id="gebiet"><option value="welt">World</option><option value="europa">Europe</option></select></label>
+<div class="kartenkopf"><label>Area <select id="gebiet"><option value="welt">World</option><option value="europa">Europe</option><option value="nordamerika">North America</option><option value="suedamerika">South America</option><option value="asien">Asia</option><option value="afrika">Africa</option><option value="ozeanien">Oceania</option></select></label>
 <label>View <select id="ansicht"><option value="laender">Countries (all outlets)</option>
 <option value="regionen">Regions &amp; language groups</option></select></label>
 <label>Indicator <select id="kz"></select></label><button id="zoom-reset" type="button">Reset view</button><span id="kz-legende" class="legende-verlauf"></span></div>
@@ -2212,6 +2345,10 @@ Rough live analysis during scraping, import and translation – not final.</p>
 
 <section id="qualitaet"><h2>Translation quality classifier</h2>
 {qualitaet_html()}
+</section>
+
+<section id="workflow"><h2>Workflow (Snakemake)</h2>
+{workflow_html()}
 </section>
 
 <h2 class="block" id="g-framing">Framing, sources and verification</h2>
@@ -2460,6 +2597,7 @@ document.addEventListener('mousemove', e => {{
 }});
 </script></body></html>"""
 
+seite = forest_ersetzen(seite)
 seite = englisch(inhaltsverzeichnis(links_einfuegen(seite)))
 with open(os.path.join(AUS, "dashboard.html.tmp"), "w", encoding="utf-8") as fh:
     fh.write(seite)
