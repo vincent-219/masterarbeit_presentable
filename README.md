@@ -1,3 +1,5 @@
+**[Live-Dashboard ansehen](https://vincent-219.github.io/masterarbeit_presentable/)** (Fortschritt und Zwischenergebnisse, alle 30 Minuten aktualisiert)
+
 # Israel–Palästina in europäischen und weiteren Medien
 
 English version: [README_en.md](README_en.md)
