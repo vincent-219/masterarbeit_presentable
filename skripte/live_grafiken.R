@@ -48,7 +48,7 @@ pew_plot <- function(p) ggplot(pew_lang, aes(x, wert, group = land_en, colour = 
   scale_y_continuous(limits = c(20, 100), breaks = seq(20, 100, 20), labels = \(v) paste0(v, " %")) +
   facet_grid(richtung ~ continent, scales = "free_y", space = "free_y", drop = TRUE) + thema(p) +
   theme(axis.text.x = element_text(size = 9))
-speichern(pew_plot, "pew_israel", 15, 9)
+speichern(pew_plot, "pew_israel", 12, 8.5)
 
 ## ---- YouGov: Sympathie für die palästinensische minus die israelische Seite (Prozentpunkte), Linien je Land, Gruppen = UN-Unterregion ----
 yg <- u |> filter(quelle == "YouGov EuroTrack", frage == "Sympathie im israelisch-palästinensischen Konflikt", antwort %in% c("israelische Seite", "palästinensische Seite")) |>
@@ -72,5 +72,5 @@ yg_plot <- function(p) {
     labs(subtitle = "Percentage points: sympathy with the Palestinian side minus sympathy with the Israeli side (positive = more Palestinian)") +
     theme(plot.subtitle = element_text(colour = p$text2, size = 10), axis.text.x = element_text(size = 9))
 }
-speichern(yg_plot, "yougov_sympathie", 11, 7)
+speichern(yg_plot, "yougov_sympathie", 9, 7)
 cat("Grafiken geschrieben\n")

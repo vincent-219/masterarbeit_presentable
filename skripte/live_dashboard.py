@@ -2243,7 +2243,7 @@ body.hat-gross #gross-hinter {{ display:block; }} body.hat-gross {{ overflow:hid
 .chart .zell-h {{ fill:#ffffff; font-size:11px; font-variant-numeric:tabular-nums; }}
 .chart g[data-tip]:hover .bar, .chart g[data-tip]:hover rect[fill] {{ opacity:.8; }}
 .chart .s0 {{ fill:var(--s0); stroke:var(--karte); stroke-width:2; }}
-.gg img {{ width:100%; height:auto; display:block; }} .gg-dunkel {{ display:none; }}
+.gg img {{ width:100%; height:auto; display:block; cursor:zoom-in; }} #gg-zoom {{ position:fixed; inset:0; background:rgba(0,0,0,.82); z-index:99; overflow:auto; display:none; cursor:zoom-out; }} #gg-zoom img {{ width:max(190vw,1800px); max-width:none; background:var(--karte,#fff); display:block; margin:2rem auto; padding:1rem; border-radius:6px; }} .gg-dunkel {{ display:none; }}
 @media (prefers-color-scheme: dark) {{ :root:not([data-theme="light"]) .gg-hell {{ display:none; }} :root:not([data-theme="light"]) .gg-dunkel {{ display:block; }} }}
 :root[data-theme="dark"] .gg-hell {{ display:none; }} :root[data-theme="dark"] .gg-dunkel {{ display:block; }} .chart .s1 {{ fill:var(--s1); stroke:var(--karte); stroke-width:2; }}
 .legende svg .s0 {{ fill:var(--s0); }} .legende svg .s1 {{ fill:var(--s1); }}
@@ -2595,6 +2595,13 @@ document.addEventListener('mousemove', e => {{
   const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8);
   tip.style.left = x + 'px'; tip.style.top = (e.clientY + 14) + 'px';
 }});
+const ggz = document.createElement('div'); ggz.id = 'gg-zoom'; document.body.appendChild(ggz);
+document.addEventListener('click', e => {{
+  const im = e.target.closest('.gg img');
+  if (im) {{ ggz.innerHTML = ''; const c = document.createElement('img'); c.src = im.src; ggz.appendChild(c); ggz.style.display = 'block'; return; }}
+  if (e.target.closest('#gg-zoom') || e.key === 'Escape') ggz.style.display = 'none';
+}});
+document.addEventListener('keydown', e => {{ if (e.key === 'Escape') ggz.style.display = 'none'; }});
 </script></body></html>"""
 
 seite = forest_ersetzen(seite)
