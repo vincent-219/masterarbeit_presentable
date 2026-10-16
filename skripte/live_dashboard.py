@@ -1650,42 +1650,60 @@ def sympathie_html():
 def pew_html():
     if not pew:
         return '<p class="leer">no survey data</p>'
-    beide = sorted((l for l in pew if pew[l].get("Frühjahr 2025") and pew[l].get("Frühjahr 2026")), key=lambda l: -pew[l]["Frühjahr 2026"])
+    beide = [l for l in pew if pew[l].get("Frühjahr 2025") and pew[l].get("Frühjahr 2026")]
     nur26 = sorted((l for l in pew if l not in beide and pew[l].get("Frühjahr 2026")), key=lambda l: -pew[l]["Frühjahr 2026"])
-    alle_werte = [v for l in pew for v in pew[l].values() if v]
+    aend = lambda l: pew[l]["Frühjahr 2026"] - pew[l]["Frühjahr 2025"]
+    steigt = sorted((l for l in beide if aend(l) > 0), key=lambda l: -aend(l))
+    sinkt = sorted((l for l in beide if aend(l) <= 0), key=aend)
+    alle_werte = [pew[l][w] for l in beide for w in ("Frühjahr 2025", "Frühjahr 2026")]
     lo = max(0, (min(alle_werte) - 5) // 10 * 10)
-    W, lw, rw, h = 640, 150, 118, 24
-    X = lambda v: lw + (W - lw - rw) * (v - lo) / (100 - lo)
-    kopf = 22
-    zeilen = [(l, True) for l in beide] + [(None, False)] * bool(nur26) + [(l, False) for l in nur26]
-    H = kopf + len(zeilen) * h + 30
-    o = [f'<svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Unfavourable view of Israel by country, spring 2025 and 2026">']
-    o.append(f'<text x="{W - rw + 6}" y="12" class="klein" font-weight="600">Change 2025 → 2026</text>')
-    for v in range(lo, 101, 10):
-        o.append(f'<line x1="{X(v):.1f}" y1="{kopf - 6}" x2="{X(v):.1f}" y2="{H - 30}" class="achse" opacity=".45"/>'
-                 f'<text x="{X(v):.1f}" y="{H - 12}" text-anchor="middle" class="klein">{v} %</text>')
-    for k, (u_land, mit_beiden) in enumerate(zeilen):
-        y = kopf + k * h + 12
-        if u_land is None:
-            o.append(f'<line x1="8" y1="{y - 12}" x2="{W - 8}" y2="{y - 12}" class="achse" opacity=".6"/>'
-                     f'<text x="{lw - 8}" y="{y + 4}" text-anchor="end" class="klein" font-style="italic">only spring 2026</text>')
-            continue
-        a, b = pew[u_land].get("Frühjahr 2025"), pew[u_land].get("Frühjahr 2026")
-        o.append(f'<text x="{lw - 8}" y="{y + 4}" text-anchor="end" class="lab">{E(u_land)}</text>')
-        if a and b:
-            o.append(f'<line x1="{X(a):.1f}" y1="{y}" x2="{X(b):.1f}" y2="{y}" stroke="var(--achse)" stroke-width="2.5"/>')
-        for v, kl, j in ((a, 0, "2025"), (b, 1, "2026")):
-            if v:
-                o.append(f'<g data-tip="{E(u_land)}, spring {j}: {v} % unfavourable view of Israel">'
-                         f'<circle cx="{X(v):.1f}" cy="{y}" r="10" class="hit"/><circle cx="{X(v):.1f}" cy="{y}" r="5" class="s{kl}"/></g>')
-        if a and b:
-            d = b - a; rel = 100 * d / a
-            zeichen = "+" if d > 0 else "−" if d < 0 else "±"
-            o.append(f'<g data-tip="{E(u_land)}: {a} % → {b} %, {zeichen}{abs(d)} percentage points ({zeichen}{abs(rel):.0f} % relative)">'
-                     f'<text x="{W - rw + 6}" y="{y + 4}" class="lab" font-weight="600">{zeichen}{abs(d)} pp</text>'
-                     f'<text x="{W - 6}" y="{y + 4}" text-anchor="end" class="klein">{zeichen}{abs(rel):.0f} %</text></g>')
-    o.append("</svg>")
-    return legende([(0, "Spring 2025"), (1, "Spring 2026")]) + "".join(o)
+    W, H, xl, xr, oben, unten = 780, 360, 215, 465, 34, 20
+    Y = lambda v: oben + (H - oben - unten) * (100 - v) / (100 - lo)
+
+    def verteilen(werte, abstand=13.5):
+        """Beschriftungshöhen entzerren: sortiert nach y, mindestens `abstand` Pixel auseinander"""
+        idx = sorted(range(len(werte)), key=lambda i: werte[i])
+        ys = [werte[i] for i in idx]
+        for k in range(1, len(ys)):
+            ys[k] = max(ys[k], ys[k - 1] + abstand)
+        if ys and ys[-1] > H - unten + 6:   # unten überstanden: nach oben zurückschieben
+            ys[-1] = H - unten + 6
+            for k in range(len(ys) - 2, -1, -1):
+                ys[k] = min(ys[k], ys[k + 1] - abstand)
+        out = [0] * len(werte)
+        for pos, i in enumerate(idx):
+            out[i] = ys[pos]
+        return out
+
+    def panel(titel, laender, kl):
+        if not laender:
+            return ""
+        o = [f'<h3>{titel}</h3><svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="{titel}">']
+        for v in range(lo, 101, 10):
+            o.append(f'<line x1="{xl}" y1="{Y(v):.1f}" x2="{xr}" y2="{Y(v):.1f}" class="achse" opacity=".25"/>')
+        o.append(f'<text x="{xl}" y="16" text-anchor="middle" class="lab" font-weight="600">Spring 2025</text>'
+                 f'<text x="{xr}" y="16" text-anchor="middle" class="lab" font-weight="600">Spring 2026</text>')
+        ya = verteilen([Y(pew[l]["Frühjahr 2025"]) + 4 for l in laender])
+        yb = verteilen([Y(pew[l]["Frühjahr 2026"]) + 4 for l in laender])
+        for k, l in enumerate(laender):
+            a, b = pew[l]["Frühjahr 2025"], pew[l]["Frühjahr 2026"]
+            d = b - a; rel = 100 * d / a; z = "+" if d > 0 else "−" if d < 0 else "±"
+            tip = f'{E(l)}: {a} % → {b} %, {z}{abs(d)} percentage points ({z}{abs(rel):.0f} % relative)'
+            o.append(f'<g data-tip="{tip}">'
+                     f'<line x1="{xl}" y1="{Y(a):.1f}" x2="{xr}" y2="{Y(b):.1f}" stroke="var(--s{kl})" stroke-width="2" stroke-linecap="round"/>'
+                     f'<line x1="{xl}" y1="{Y(a):.1f}" x2="{xr}" y2="{Y(b):.1f}" stroke="transparent" stroke-width="12"/>'
+                     f'<circle cx="{xl}" cy="{Y(a):.1f}" r="4" class="s{kl}"/><circle cx="{xr}" cy="{Y(b):.1f}" r="4" class="s{kl}"/>'
+                     f'<text x="{xl - 10}" y="{ya[k]:.1f}" text-anchor="end" class="lab">{E(l)} {a}</text>'
+                     f'<text x="{xr + 10}" y="{yb[k]:.1f}" class="lab">{b}  {E(l)} <tspan font-weight="600">{z}{abs(d)} pp</tspan> <tspan class="klein">({z}{abs(rel):.0f} %)</tspan></text></g>')
+        o.append("</svg>")
+        return "".join(o)
+
+    note = ""
+    if nur26:
+        note = ('<p class="klein">Spring 2026 only (no line, no change): ' + ", ".join(f"{E(l)} {pew[l]['Frühjahr 2026']} %" for l in nur26) + ".</p>")
+    return (legende([(1, "More unfavourable in 2026"), (0, "Less unfavourable or unchanged")])
+            + panel(f"More unfavourable than in 2025 ({len(steigt)} countries)", steigt, 1)
+            + panel(f"Less unfavourable or unchanged ({len(sinkt)} countries)", sinkt, 0) + note)
 
 # ---- Medien im Vergleich (innerhalb eines Landes) und Medienauswahl ----
 SPEKTRUM = ["links", "mitte-links", "mitte", "mitte-rechts", "rechts", "unklar"]
@@ -2214,7 +2232,7 @@ Survey 2010); click an outlet for the reasoning and evidence.</p>
 Only countries covered by the institutes.</p>
 <div class="raster">
 <section><h2>Sympathy: Israeli vs. Palestinian side (YouGov)</h2><p>“In the conflict between Israel and the Palestinians, which side do you sympathise with more?” Share in %; “both equally” and “don’t know” not shown.</p>{sympathie_html()}</section>
-<section><h2>Unfavourable view of Israel (Pew)</h2><p>Share “somewhat” or “very unfavourable”, spring 2025 and 2026. Right: change in percentage points (pp) and relative to 2025 (%).</p>{pew_html()}</section>
+<section><h2>Unfavourable view of Israel (Pew)</h2><p>Share “somewhat” or “very unfavourable”, spring 2025 and 2026. Lines connect the two waves, grouped by direction; labels show the change in percentage points (pp) and relative to 2025 (%).</p>{pew_html()}</section>
 </div>
 <section><h2>Media vs. public opinion</h2><p>Each country is a dot: survey value (x) against the media indicator (y) from that country’s articles ±{FENSTER} days around the fieldwork
 (at least 20 translated/English articles). Few countries, so exploratory only; r = Pearson correlation.</p>
