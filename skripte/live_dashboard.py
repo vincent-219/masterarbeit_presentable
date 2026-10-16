@@ -80,11 +80,18 @@ AKTEUR_KEY = dict(zip(AKTEURE, ["idf", "israel_regierung", "gaza_behoerden", "ha
 SCHLUESSEL_NAME = {v: k for k, v in {**FRAME_KEY, **AKTEUR_KEY}.items()} | {"verifikation": "Verification caveat",
                                                                       "woerter": "Text length"}
 SATZ_TRENNER = re.compile(r"(?<=[.!?])\s+|\n+")
-# Selbstverteidigung: gemessen wird nur, ob sie im israelischen Kontext vorkommt, unabhängig von Haltung oder Kritik. Ein Satz zählt,
-# wenn er den Begriff enthält und nicht das Recht der Palästinenser (SV_PAL) oder einen anderen Konflikt (SV_ANDERE) meint.
+# Selbstverteidigung: gemessen wird, ob sie im israelischen Kontext in Anspruch genommen oder erörtert wird. Ein Satz zählt, wenn er den Begriff
+# enthält und weder das Recht der Palästinenser (SV_PAL) noch einen anderen Konflikt (SV_ANDERE) meint noch die Selbstverteidigung
+# verneint („this is not self-defence“, SV_NEG).
 SV_SATZ = re.compile(r"self-defen[cs]e|right to (defend|protect) (itself|themselves|herself|himself)|right to defend", re.I)
 SV_PAL = re.compile(r"palestinian[s]?('| have| has)?[^.]{0,30}right to (defend|self-defen|resist)|right of (the )?palestinians to", re.I)
 SV_ANDERE = re.compile(r"ukrain|russia|taiwan|armenia|azerbaij|kosovo|nagorno|kurd", re.I)
+SV_NEG = re.compile(r"\b(is|was|are|were)? ?not (an act of |legitimate |a war of )?(self-defen|defen[cs]e)|not in self-defen|"
+                    r"(beyond|exceed\w*|far beyond)[^.]{0,30}self-defen|moved beyond self-defen|"
+                    r"(pretext|guise|name|excuse|cover|euphemism) of[^.]{0,40}(self-defen|right to (\(?\w+\)? )?(defend|self))|so-called self-defen|supposed self-defen|"
+                    r"no right (to|of) (self-defen|defend|claim self)|no right of self-defen|reject\w*[^.]{0,60}self-defen|"
+                    r"does not amount to self-defen|cannot be justified as self-defen|could not be justified as self-defen|"
+                    r"deny legitimacy|massacred in the name|nothing can ever justify|nothing to do with self-defen", re.I)
 # Apartheid: Sätze über das südafrikanische Apartheidregime zählen nicht, außer sie beziehen es auf Israel/Palästina
 APA = re.compile(r"\bapartheid", re.I)
 APA_SUEDAFRIKA = re.compile(r"south africa|afrikaans|cape town|angola|vietnam war|1980s", re.I)
@@ -92,7 +99,7 @@ APA_ISRAEL = re.compile(r"israel\w*[^.]{0,40}apartheid|apartheid[^.]{0,40}(israe
 # Humanitär: „(international) humanitarian law“ ist Völkerrecht, nicht humanitäre Lage
 HUM_RECHT = re.compile(r"(international )?humanitarian law", re.I)
 def selbstverteidigung_treffer(text):
-    return any(SV_SATZ.search(s) and not SV_PAL.search(s) and not SV_ANDERE.search(s) for s in SATZ_TRENNER.split(text))
+    return any(SV_SATZ.search(s) and not SV_PAL.search(s) and not SV_ANDERE.search(s) and not SV_NEG.search(s) for s in SATZ_TRENNER.split(text))
 def apartheid_treffer(text):
     return any(APA.search(s) and (not APA_SUEDAFRIKA.search(s) or APA_ISRAEL.search(s)) for s in SATZ_TRENNER.split(text))
 FRAME_SONDER = {"Self-defence": selbstverteidigung_treffer, "Apartheid": apartheid_treffer, "Humanitarian": lambda text: bool(FRAMES["Humanitarian"].search(HUM_RECHT.sub(" ", text)))}
@@ -1277,8 +1284,8 @@ def methoden_html():
                      f'{ame_deutung(au["quellen"], "Change per step to the right, as above, for sources and the verification caveat.", "more frequent further right", "less frequent further right")}'
                      f'<p class="klein">Caution: leaning varies only between outlets; with the random effect per outlet the '
                      f'information rests on the number of outlets, not of articles. “right” is barely populated so far. The frame “Self-defence” '
-                     f'measures whether self-defence is raised in the Israeli context, whatever the stance (affirmative, conditional or critical); '
-                     f'sentences about the Palestinians’ right to defend themselves do not count.</p></section>')
+                     f'measures whether self-defence is invoked or discussed in the Israeli context (affirmative or conditional); '
+                     f'denials (“this is not self-defence”) and sentences about the Palestinians’ right to defend themselves do not count.</p></section>')
     elif au.get("fehler"):
         teile.append(f'<section><h2>Political leaning: multilevel models</h2><p class="leer">{E(au["fehler"])}</p></section>')
     es = methoden.get("ereignisstudie", {})

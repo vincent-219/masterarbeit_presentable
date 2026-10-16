@@ -259,12 +259,13 @@ Die aktuelle Länderauswahl steht im Eintrag „Stichprobe im Überblick“ (Umf
   im Dashboard unter „Datenqualität“.
 
 - **Selbstverteidigung: Vorkommen im israelischen Kontext** (17.10.2026; `R/55_frames.R`, gleichlautend in
-  `skripte/live_dashboard.py`; Validierung in `skripte/a5_validierung.R`): Der Frame misst nur, ob Selbstverteidigung im
-  israelischen Kontext vorkommt, unabhängig von Haltung, Zustimmung oder Kritik. Ein Satz zählt, wenn er den Begriff
+  `skripte/live_dashboard.py`; Validierung in `skripte/a5_validierung.R`): Der Frame misst, ob Selbstverteidigung im
+  israelischen Kontext in Anspruch genommen oder erörtert wird (bejahend oder bedingt). Ein Satz zählt, wenn er den Begriff
   enthält („self-defence“, „right to defend itself“ u. ä.) und weder das Recht der Palästinenser auf Verteidigung noch einen
-  anderen Konflikt (Ukraine, Russland, Taiwan, Armenien/Aserbaidschan, Kosovo, Kurden) meint. Ein Artikel zählt einmal, wenn
-  mindestens ein Satz zählt. Begründung: Der Frame soll das Thema erfassen, nicht eine Bewertung; Haltungen würden eine
-  zusätzliche Codierung verlangen, die diese Frage nicht braucht. Die Satzregeln sind an einer Stichprobe von 40 Sätzen
+  anderen Konflikt (Ukraine, Russland, Taiwan, Armenien/Aserbaidschan, Kosovo, Kurden) meint noch die Selbstverteidigung
+  verneint („this is not self-defence“, „beyond self-defence“, „under the pretext of self-defence“ u. ä.). Ein Artikel zählt einmal, wenn
+  mindestens ein Satz zählt. Begründung: Der Frame soll erfassen, wo Israels Selbstverteidigung als Argument vorkommt; ein Satz, der sie
+  bestreitet, gehört nicht dazu. Die Satzregeln sind an einer Stichprobe von 40 Sätzen
   von Hand zu prüfen (Abschnitt 13.3 in `02_pipeline.Rmd`).
 
 ## 5. Ländermerkmale und Einordnungen

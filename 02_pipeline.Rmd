@@ -785,9 +785,10 @@ klären KWIC und die Quellen-Analyse.
 
 ## Selbstverteidigung im israelischen Kontext
 
-Der Frame „Selbstverteidigung“ misst nur, ob Selbstverteidigung im israelischen Kontext vorkommt,
-unabhängig von Haltung oder Kritik. Ein Satz zählt, wenn er den Begriff enthält und weder das Recht
-der Palästinenser auf Verteidigung noch einen anderen Konflikt (z. B. Ukraine) meint. Die Regeln sind
+Der Frame „Selbstverteidigung“ misst, ob Selbstverteidigung im israelischen Kontext in Anspruch genommen
+oder erörtert wird. Ein Satz zählt, wenn er den Begriff enthält und weder das Recht der Palästinenser auf
+Verteidigung noch einen anderen Konflikt (z. B. Ukraine) meint noch die Selbstverteidigung verneint
+(„This is not self-defence“). Die Regeln sind
 an Stichproben geprüft und werden in Abschnitt 13.3 validiert.
 
 ```{r selbstverteidigung, eval = FALSE}

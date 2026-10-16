@@ -766,9 +766,9 @@ clarify what lies behind it.
 
 ## Self-defence in the Israeli Context
 
-The frame “Self-defence” only measures whether self-defence is raised in the Israeli context, whatever the
-stance or criticism. A sentence counts if it contains the term and refers neither to the Palestinians’
-right to defend themselves nor to another conflict (e.g. Ukraine). The rules are checked on samples and
+The frame “Self-defence” measures whether self-defence is invoked or discussed in the Israeli context. A sentence
+counts if it contains the term and refers neither to the Palestinians’ right to defend themselves nor to
+another conflict (e.g. Ukraine), and does not deny self-defence (“This is not self-defence”). The rules are checked on samples and
 validated in section 13.3.
 
 ```{r selbstverteidigung, eval = FALSE}

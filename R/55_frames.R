@@ -31,19 +31,27 @@ textbausteine_entfernen <- function(df, text_spalte = "text_en", min_artikel = 1
 }
 
 ## ---- selbstverteidigung ----
-# Der Frame „Selbstverteidigung“ misst nur, ob Selbstverteidigung im israelischen Kontext vorkommt, unabhängig von Haltung oder Kritik.
-# Ein Satz zählt, wenn er den Begriff enthält und nicht das Recht der Palästinenser (sv_pal) oder einen anderen Konflikt (sv_andere) meint.
+# Der Frame „Selbstverteidigung“ misst, ob Selbstverteidigung im israelischen Kontext in Anspruch genommen oder erörtert wird. Ein Satz zählt,
+# wenn er den Begriff enthält und weder das Recht der Palästinenser (sv_pal) noch einen anderen Konflikt (sv_andere) meint noch die
+# Selbstverteidigung verneint („this is not self-defence“, sv_neg).
 sv_satz <- regex("self-defen[cs]e|right to (defend|protect) (itself|themselves|herself|himself)|right to defend",
                  ignore_case = TRUE)
 sv_pal <- regex("palestinian[s]?('| have| has)?[^.]{0,30}right to (defend|self-defen|resist)|right of (the )?palestinians to",
                 ignore_case = TRUE)
 sv_andere <- regex("ukrain|russia|taiwan|armenia|azerbaij|kosovo|nagorno|kurd", ignore_case = TRUE)
+sv_neg <- regex(paste0("\\b(is|was|are|were)? ?not (an act of |legitimate |a war of )?(self-defen|defen[cs]e)|not in self-defen|",
+                       "(beyond|exceed\\w*|far beyond)[^.]{0,30}self-defen|moved beyond self-defen|",
+                       "(pretext|guise|name|excuse|cover|euphemism) of[^.]{0,40}(self-defen|right to (\\(?\\w+\\)? )?(defend|self))|so-called self-defen|supposed self-defen|",
+                       "no right (to|of) (self-defen|defend|claim self)|no right of self-defen|reject\\w*[^.]{0,60}self-defen|",
+                       "does not amount to self-defen|cannot be justified as self-defen|could not be justified as self-defen|",
+                       "deny legitimacy|massacred in the name|nothing can ever justify|nothing to do with self-defen"),
+                ignore_case = TRUE)
 
 # Ein Datensatz je zählendem Satz (für Validierung und KWIC)
 sv_saetze <- function(df, text_spalte = "text_en") {
   tibble(id = df$id, satz = saetze(df[[text_spalte]])) |>
     unnest(satz) |>
-    filter(str_detect(satz, sv_satz), !str_detect(satz, sv_pal), !str_detect(satz, sv_andere)) |>
+    filter(str_detect(satz, sv_satz), !str_detect(satz, sv_pal), !str_detect(satz, sv_andere), !str_detect(satz, sv_neg)) |>
     mutate(satz = str_squish(satz))
 }
 
