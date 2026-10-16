@@ -1650,23 +1650,40 @@ def sympathie_html():
 def pew_html():
     if not pew:
         return '<p class="leer">no survey data</p>'
-    zeilen = sorted(pew, key=lambda l: -pew[l].get("Frühjahr 2026", 0))
-    W, lw, h = 560, 170, 24
-    X = lambda v: lw + (W - lw - 50) * (v - 40) / 60
-    o = [f'<svg viewBox="0 0 {W} {len(zeilen) * h + 24}" class="chart" role="img">']
-    for v in (40, 60, 80, 100):
-        o.append(f'<line x1="{X(v):.1f}" y1="0" x2="{X(v):.1f}" y2="{len(zeilen) * h}" class="achse" opacity=".5"/>'
-                 f'<text x="{X(v):.1f}" y="{len(zeilen) * h + 16}" text-anchor="middle" class="klein">{v} %</text>')
-    for k, u_land in enumerate(zeilen):
-        y = k * h + 12
+    beide = sorted((l for l in pew if pew[l].get("Frühjahr 2025") and pew[l].get("Frühjahr 2026")), key=lambda l: -pew[l]["Frühjahr 2026"])
+    nur26 = sorted((l for l in pew if l not in beide and pew[l].get("Frühjahr 2026")), key=lambda l: -pew[l]["Frühjahr 2026"])
+    alle_werte = [v for l in pew for v in pew[l].values() if v]
+    lo = max(0, (min(alle_werte) - 5) // 10 * 10)
+    W, lw, rw, h = 640, 150, 118, 24
+    X = lambda v: lw + (W - lw - rw) * (v - lo) / (100 - lo)
+    kopf = 22
+    zeilen = [(l, True) for l in beide] + [(None, False)] * bool(nur26) + [(l, False) for l in nur26]
+    H = kopf + len(zeilen) * h + 30
+    o = [f'<svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Unfavourable view of Israel by country, spring 2025 and 2026">']
+    o.append(f'<text x="{W - rw + 6}" y="12" class="klein" font-weight="600">Change 2025 → 2026</text>')
+    for v in range(lo, 101, 10):
+        o.append(f'<line x1="{X(v):.1f}" y1="{kopf - 6}" x2="{X(v):.1f}" y2="{H - 30}" class="achse" opacity=".45"/>'
+                 f'<text x="{X(v):.1f}" y="{H - 12}" text-anchor="middle" class="klein">{v} %</text>')
+    for k, (u_land, mit_beiden) in enumerate(zeilen):
+        y = kopf + k * h + 12
+        if u_land is None:
+            o.append(f'<line x1="8" y1="{y - 12}" x2="{W - 8}" y2="{y - 12}" class="achse" opacity=".6"/>'
+                     f'<text x="{lw - 8}" y="{y + 4}" text-anchor="end" class="klein" font-style="italic">only spring 2026</text>')
+            continue
         a, b = pew[u_land].get("Frühjahr 2025"), pew[u_land].get("Frühjahr 2026")
         o.append(f'<text x="{lw - 8}" y="{y + 4}" text-anchor="end" class="lab">{E(u_land)}</text>')
         if a and b:
-            o.append(f'<line x1="{X(a):.1f}" y1="{y}" x2="{X(b):.1f}" y2="{y}" stroke="var(--achse)" stroke-width="2"/>')
+            o.append(f'<line x1="{X(a):.1f}" y1="{y}" x2="{X(b):.1f}" y2="{y}" stroke="var(--achse)" stroke-width="2.5"/>')
         for v, kl, j in ((a, 0, "2025"), (b, 1, "2026")):
             if v:
                 o.append(f'<g data-tip="{E(u_land)}, spring {j}: {v} % unfavourable view of Israel">'
                          f'<circle cx="{X(v):.1f}" cy="{y}" r="10" class="hit"/><circle cx="{X(v):.1f}" cy="{y}" r="5" class="s{kl}"/></g>')
+        if a and b:
+            d = b - a; rel = 100 * d / a
+            zeichen = "+" if d > 0 else "−" if d < 0 else "±"
+            o.append(f'<g data-tip="{E(u_land)}: {a} % → {b} %, {zeichen}{abs(d)} percentage points ({zeichen}{abs(rel):.0f} % relative)">'
+                     f'<text x="{W - rw + 6}" y="{y + 4}" class="lab" font-weight="600">{zeichen}{abs(d)} pp</text>'
+                     f'<text x="{W - 6}" y="{y + 4}" text-anchor="end" class="klein">{zeichen}{abs(rel):.0f} %</text></g>')
     o.append("</svg>")
     return legende([(0, "Spring 2025"), (1, "Spring 2026")]) + "".join(o)
 
@@ -2197,7 +2214,7 @@ Survey 2010); click an outlet for the reasoning and evidence.</p>
 Only countries covered by the institutes.</p>
 <div class="raster">
 <section><h2>Sympathy: Israeli vs. Palestinian side (YouGov)</h2><p>“In the conflict between Israel and the Palestinians, which side do you sympathise with more?” Share in %; “both equally” and “don’t know” not shown.</p>{sympathie_html()}</section>
-<section><h2>Unfavourable view of Israel (Pew)</h2><p>Share “somewhat” or “very unfavourable”, spring 2025 and 2026.</p>{pew_html()}</section>
+<section><h2>Unfavourable view of Israel (Pew)</h2><p>Share “somewhat” or “very unfavourable”, spring 2025 and 2026. Right: change in percentage points (pp) and relative to 2025 (%).</p>{pew_html()}</section>
 </div>
 <section><h2>Media vs. public opinion</h2><p>Each country is a dot: survey value (x) against the media indicator (y) from that country’s articles ±{FENSTER} days around the fieldwork
 (at least 20 translated/English articles). Few countries, so exploratory only; r = Pearson correlation.</p>
