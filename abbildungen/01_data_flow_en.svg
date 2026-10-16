@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1190" width="1500" height="1190" font-family="Helvetica, Arial, sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1250" width="1500" height="1250" font-family="Helvetica, Arial, sans-serif" font-size="13">
   <title>Data flow of the pipeline: from configuration to analysis</title>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -21,14 +21,14 @@
   </defs>
 
   <text x="40" y="30" font-size="20" font-weight="bold" fill="#1f2d3a">Israel–Palestine in European and further media: data flow of the pipeline</text>
-  <text x="40" y="50" class="l">Rectangle = processing step (code in R/ and skripte/) · diamond = decision · blue = stored data · red = stop / suspend</text>
+  <text x="40" y="50" class="l">Rectangle = processing step (code in R/ and skripte/) · diamond = decision · blue = stored data · red = stop / suspend · dashed = optional (supercomputer)</text>
 
   <!-- Panel 1 -->
   <rect class="panel" x="25" y="62" width="1450" height="115"/>
   <text class="pt" x="40" y="84">1 Planning and URLs</text>
   <rect class="box" x="40" y="98" width="330" height="62"/>
   <text class="b" x="55" y="120">Configuration (R/01)</text>
-  <text class="t" x="55" y="140">54 countries · 377 outlets · periods F1–F6 + K</text>
+  <text class="t" x="55" y="140">74 countries · 488 outlets · periods F1–F6 + K</text>
   <rect class="box" x="430" y="98" width="330" height="62"/>
   <text class="b" x="445" y="120">Collect URLs (R/14)</text>
   <text class="t" x="445" y="140">robots.txt · sitemaps · Media Cloud · archive scrapers</text>
@@ -113,7 +113,7 @@
   <path class="pf" d="M750,718 L820,718"/>
 
   <!-- Panel 4 -->
-  <rect class="panel" x="25" y="786" width="1450" height="180"/>
+  <rect class="panel" x="25" y="786" width="1450" height="240"/>
   <text class="pt" x="40" y="808">4 Import, translation, relevance</text>
   <path class="pf" d="M1280,374 L1280,780"/>
   <path class="pf" d="M1140,718 L1160,718 L1160,780"/>
@@ -143,10 +143,20 @@
   <path class="pf" d="M930,884 L980,884"/>
   <path class="pf" d="M1210,884 L1260,884"/>
 
+    <!-- Optional: Cluster -->
+  <rect class="note" x="340" y="940" width="590" height="70"/>
+  <text class="b" x="355" y="962">Optional: supercomputer (bwUniCluster 3.0)</text>
+  <text class="t" x="355" y="981">Bulk work with Snakemake: one GPU job per package (Slurm)</text>
+  <text class="t" x="355" y="999">Results return as engine nllb_hpc into SQLite; the local path above works without it</text>
+  <path class="pfs" d="M430,922 L430,940"/>
+  <path class="pfs" d="M520,940 L520,922"/>
+  <path class="pfs" d="M750,922 L750,940"/>
+  <path class="pfs" d="M840,940 L840,922"/>
+
+  <g transform="translate(0,60)">
   <!-- Panel 5 -->
   <rect class="panel" x="25" y="978" width="1450" height="140"/>
   <text class="pt" x="40" y="1000">5 Analysis and validation</text>
-  <path class="pf" d="M1360,922 L1360,970 L300,970 L300,1022"/>
   <rect class="box" x="40" y="1022" width="300" height="76"/>
   <text class="b" x="55" y="1044">Frames (R/55)</text>
   <text class="t" x="55" y="1063">dictionaries, boilerplate removed,</text>
@@ -166,6 +176,8 @@
   <path class="pf" d="M340,1060 L390,1060"/>
   <path class="pf" d="M690,1060 L740,1060"/>
   <path class="pf" d="M1070,1060 L1120,1060"/>
+  </g>
+  <path class="pf" d="M1360,922 L1360,1032 L300,1032 L300,1082"/>
 
-  <text x="40" y="1150" class="l">Main document with explanations: 02_pipeline_en.Rmd · decisions with date and rationale: DECISIONS_en.md · loops during operation: abbildungen/02_operation_and_decisions_en.svg</text>
+  <text x="40" y="1210" class="l">Main document with explanations: 02_pipeline_en.Rmd · decisions with date and rationale: DECISIONS_en.md · loops during operation: abbildungen/02_operation_and_decisions_en.svg</text>
 </svg>
