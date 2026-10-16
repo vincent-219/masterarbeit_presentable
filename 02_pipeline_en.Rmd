@@ -768,7 +768,7 @@ clarify what lies behind it.
 
 The frame “Self-defence” measures whether self-defence is invoked or discussed in the Israeli context. A sentence
 counts if it contains the term and refers neither to the Palestinians’ right to defend themselves nor to
-another conflict (e.g. Ukraine), and does not deny self-defence (“This is not self-defence”). The rules are checked on samples and
+another conflict (e.g. Ukraine), and does not deny self-defence (“This is not self-defence”). The denying sentences form the separate frame “Self-defence denied”. The rules are checked on samples and
 validated in section 13.3.
 
 ```{r selbstverteidigung, eval = FALSE}

@@ -57,11 +57,12 @@ FRAMES = {
     "Occupation": w("occupation", "occupied", "occupied territories", "settler*", "settlement*", "annex*"),
     "Apartheid": w("apartheid"),
     "Self-defence": w("self-defen*", "right to self-defence", "right to defend"),
+    "Self-defence denied": w("self-defen*"),
     "Terror": w("terror*"),
     "Humanitarian": w("humanitarian", "famine", "starvation", "hunger", "aid", "civilian*"),
     "Antisemitism": w("antisemit*", "anti-semit*"),
 }
-FRAME_KEY = dict(zip(FRAMES, ["genozid", "voelkerrecht", "besatzung", "apartheid", "selbstverteidigung",
+FRAME_KEY = dict(zip(FRAMES, ["genozid", "voelkerrecht", "besatzung", "apartheid", "selbstverteidigung", "selbstverteidigung_verneint",
                              "terror", "humanitaer", "antisemitismus"]))
 ZUSCHREIBUNG = re.compile(r"according to|\b(said|says|told|claimed|claims|stated|announced|reported|confirmed|"
                           r"denied|alleged)\b|\bcit(ed|ing)\b|spokes(man|woman|person)", re.I)
@@ -98,11 +99,13 @@ APA_SUEDAFRIKA = re.compile(r"south africa|afrikaans|cape town|angola|vietnam wa
 APA_ISRAEL = re.compile(r"israel\w*[^.]{0,40}apartheid|apartheid[^.]{0,40}(israel|palestin|west bank|gaza|occup|settle)", re.I)
 # Humanitär: „(international) humanitarian law“ ist Völkerrecht, nicht humanitäre Lage
 HUM_RECHT = re.compile(r"(international )?humanitarian law", re.I)
+def selbstverteidigung_verneint_treffer(text):
+    return any(SV_SATZ.search(s) and SV_NEG.search(s) and not SV_PAL.search(s) and not SV_ANDERE.search(s) for s in SATZ_TRENNER.split(text))
 def selbstverteidigung_treffer(text):
     return any(SV_SATZ.search(s) and not SV_PAL.search(s) and not SV_ANDERE.search(s) and not SV_NEG.search(s) for s in SATZ_TRENNER.split(text))
 def apartheid_treffer(text):
     return any(APA.search(s) and (not APA_SUEDAFRIKA.search(s) or APA_ISRAEL.search(s)) for s in SATZ_TRENNER.split(text))
-FRAME_SONDER = {"Self-defence": selbstverteidigung_treffer, "Apartheid": apartheid_treffer, "Humanitarian": lambda text: bool(FRAMES["Humanitarian"].search(HUM_RECHT.sub(" ", text)))}
+FRAME_SONDER = {"Self-defence": selbstverteidigung_treffer, "Self-defence denied": selbstverteidigung_verneint_treffer, "Apartheid": apartheid_treffer, "Humanitarian": lambda text: bool(FRAMES["Humanitarian"].search(HUM_RECHT.sub(" ", text)))}
 VERIFIKATION = re.compile(r"(could|can|cannot|can't|could not|couldn't)\s+(not\s+)?(be\s+)?(independently\s+)?(verif|confirm)|"
                           r"independently (verif|confirm)|unverified|not (been )?verified|no independent (verification|confirmation)", re.I)
 STOPP = set("""a about above after again against all also am an and any are as at be because been before being below
@@ -1285,7 +1288,7 @@ def methoden_html():
                      f'<p class="klein">Caution: leaning varies only between outlets; with the random effect per outlet the '
                      f'information rests on the number of outlets, not of articles. “right” is barely populated so far. The frame “Self-defence” '
                      f'measures whether self-defence is invoked or discussed in the Israeli context (affirmative or conditional); '
-                     f'denials (“this is not self-defence”) and sentences about the Palestinians’ right to defend themselves do not count.</p></section>')
+                     f'denials (“this is not self-defence”) and sentences about the Palestinians’ right to defend themselves do not count. The frame “Self-defence denied” counts exactly those denials of Israel’s self-defence.</p></section>')
     elif au.get("fehler"):
         teile.append(f'<section><h2>Political leaning: multilevel models</h2><p class="leer">{E(au["fehler"])}</p></section>')
     es = methoden.get("ereignisstudie", {})

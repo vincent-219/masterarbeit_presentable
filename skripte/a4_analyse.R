@@ -60,6 +60,7 @@ treffer[, "apartheid"] <- apartheid_artikel(df)
 
 # Selbstverteidigung satzweise im israelischen Kontext (R/55_frames.R)
 treffer[, "selbstverteidigung"] <- selbstverteidigung_artikel(df)
+treffer[, "selbstverteidigung_verneint"] <- selbstverteidigung_artikel(df, verneint = TRUE)
 
 # Anteil der Artikel mit mindestens einem Treffer, je Land und Zeitraum
 frame_namen <- names(diskurs_dict)

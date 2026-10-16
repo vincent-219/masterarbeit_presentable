@@ -265,7 +265,7 @@ Die aktuelle Länderauswahl steht im Eintrag „Stichprobe im Überblick“ (Umf
   anderen Konflikt (Ukraine, Russland, Taiwan, Armenien/Aserbaidschan, Kosovo, Kurden) meint noch die Selbstverteidigung
   verneint („this is not self-defence“, „beyond self-defence“, „under the pretext of self-defence“ u. ä.). Ein Artikel zählt einmal, wenn
   mindestens ein Satz zählt. Begründung: Der Frame soll erfassen, wo Israels Selbstverteidigung als Argument vorkommt; ein Satz, der sie
-  bestreitet, gehört nicht dazu. Die Satzregeln sind an einer Stichprobe von 40 Sätzen
+  bestreitet, gehört nicht dazu. Diese Sätze bilden den eigenen Frame „Selbstverteidigung verneint“ (Verneinung der Selbstverteidigung Israels; Palästinenser und andere Konflikte ausgenommen). Die Satzregeln sind an einer Stichprobe von 40 Sätzen
   von Hand zu prüfen (Abschnitt 13.3 in `02_pipeline.Rmd`).
 
 ## 5. Ländermerkmale und Einordnungen

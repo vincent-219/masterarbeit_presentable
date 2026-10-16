@@ -59,7 +59,8 @@ frame_saetze <- map_dfr(names(diskurs_dict), \(k) {
   tibble(id = df$id, satz = saetze(df$text_en)) |> unnest(satz) |>
     filter(str_detect(satz, muster)) |> slice_sample(n = 40) |> mutate(frame = k)
 })
-sv_stichprobe <- sv_saetze(df) |> slice_sample(n = 40) |> mutate(frame = "selbstverteidigung")
+sv_stichprobe <- bind_rows(sv_saetze(df) |> slice_sample(n = 40) |> mutate(frame = "selbstverteidigung"),
+                           sv_saetze(df, verneint = TRUE) |> slice_sample(n = 40) |> mutate(frame = "selbstverteidigung_verneint"))
 val_f <- bind_rows(select(filter(frame_saetze, frame != "selbstverteidigung"), id, frame, satz), select(sv_stichprobe, id, frame, satz)) |>
   mutate(nr = row_number()) |> slice_sample(prop = 1)
 write_csv(select(val_f, nr, id, frame, satz), file.path(pfade$validierung, "frames_maschine.csv"))

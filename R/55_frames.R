@@ -48,16 +48,18 @@ sv_neg <- regex(paste0("\\b(is|was|are|were)? ?not (an act of |legitimate |a war
                 ignore_case = TRUE)
 
 # Ein Datensatz je zählendem Satz (für Validierung und KWIC)
-sv_saetze <- function(df, text_spalte = "text_en") {
-  tibble(id = df$id, satz = saetze(df[[text_spalte]])) |>
+# verneint = TRUE: nur Sätze, die Israels Selbstverteidigung verneinen (Frame „Selbstverteidigung verneint“)
+sv_saetze <- function(df, text_spalte = "text_en", verneint = FALSE) {
+  s <- tibble(id = df$id, satz = saetze(df[[text_spalte]])) |>
     unnest(satz) |>
-    filter(str_detect(satz, sv_satz), !str_detect(satz, sv_pal), !str_detect(satz, sv_andere), !str_detect(satz, sv_neg)) |>
-    mutate(satz = str_squish(satz))
+    filter(str_detect(satz, sv_satz), !str_detect(satz, sv_pal), !str_detect(satz, sv_andere))
+  s <- if (verneint) filter(s, str_detect(satz, sv_neg)) else filter(s, !str_detect(satz, sv_neg))
+  mutate(s, satz = str_squish(satz))
 }
 
 # Je Artikel 0/1 (gleiche Reihenfolge wie df)
-selbstverteidigung_artikel <- function(df, text_spalte = "text_en") {
-  as.integer(df$id %in% sv_saetze(df, text_spalte)$id)
+selbstverteidigung_artikel <- function(df, text_spalte = "text_en", verneint = FALSE) {
+  as.integer(df$id %in% sv_saetze(df, text_spalte, verneint)$id)
 }
 
 ## ---- frames-satzregeln ----
