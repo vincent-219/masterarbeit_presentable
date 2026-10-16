@@ -39,7 +39,7 @@ Pearsons r / Spearmans ρ: > 0,05 schwach, > 0,20 mittelstark, > 0,50 stark, > 0
    YouGov keine; Abschnitt 6 prüft deshalb, ob die Ergebnisse auch mit n / 1,7 halten.
 2. **Ökologischer Fehlschluss.** Zusammenhänge auf Länderebene (z. B. zwischen Umfrage und Medien) sagen nichts
    darüber, ob *einzelne* Personen, die bestimmte Medien lesen, so denken.
-3. **Wenige Länder.** YouGov befragt 6–7, Pew 10 europäische Länder. Für Korrelationen und für die
+3. **Wenige Länder.** YouGov befragt 6–7 europäische Länder, Pew 10 europäische und 17 weitere Länder (Fallzahlen für diese nur in der Methodik von Pew, nicht in der Topline). Für Korrelationen und für die
    Varianz zwischen Ländern in der Mehrebenenanalyse ist das sehr wenig (Faustregel: ≥ 20–30 Einheiten auf Ebene 2).
 4. **Frageformulierung.** YouGov fragt nach *Sympathie* für eine Seite des Konflikts, Pew nach der *Meinung über
    Israel* als Staat. Das sind verwandte, aber nicht gleiche Konstrukte.
@@ -180,6 +180,7 @@ pew_neg <- pew |> filter(frage == "Meinung über Israel", antwort == "negativ") 
   select(land, welle, prozent, n, deff) |> group_by(land) |> mutate(deff = first(na.omit(deff))) |> ungroup()
 pew_test <- pew_neg |>
   pivot_wider(names_from = welle, values_from = c(prozent, n)) |>
+  filter(!is.na(`n_Frühjahr 2025`), !is.na(deff), !is.na(`prozent_Frühjahr 2026`)) |>   # nur Länder mit veröffentlichter Fallzahl 2025 (die außereuropäischen Länder haben sie nicht)
   mutate(n26 = 1000, n_eff25 = `n_Frühjahr 2025` / deff, n_eff26 = n26 / deff) |>
   rowwise() |>
   mutate(pt = list(prop.test(round(c(`prozent_Frühjahr 2025`, `prozent_Frühjahr 2026`) / 100 * c(n_eff25, n_eff26)),
