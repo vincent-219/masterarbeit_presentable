@@ -1,0 +1,12 @@
+[Unit]
+Description=Masterarbeit: Nachtlauf täglich um 1:00 (weckt den PC aus dem Ruhezustand)
+
+[Timer]
+OnCalendar=*-*-* 01:00:00
+WakeSystem=true
+AccuracySec=1min
+# Kein Nachholen, wenn der PC um 1:00 aus war
+Persistent=false
+
+[Install]
+WantedBy=timers.target

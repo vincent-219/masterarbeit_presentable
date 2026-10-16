@@ -1,0 +1,32 @@
+# Daten: Volltexte dürfen nicht veröffentlicht werden (§ 60d UrhG)
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+logs/
+
+# Geheimnisse
+.Renviron
+.env
+
+# R / RStudio
+.Rhistory
+.RData
+.Rproj.user/
+*_cache/
+*_files/
+*.html
+recon_*.R
+~/
+
+# Texte Dritter (eurotopics.net) und Dashboard-Schnappschuss: nicht veröffentlichen
+medien_einordnung/eurotopics_profile*.json
+medien_einordnung/medien_begruendung.csv
+dashboard/
+
+# lokale Werkzeuge, Sicherungen und Laufdateien (13.10.2026)
+backups/
+__pycache__/
+*.bak*
+watch_*
+scraping.log

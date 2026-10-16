@@ -1,0 +1,361 @@
+---
+title: "Bevölkerungsmeinung zu Israel/Palästina: repräsentative Umfragen"
+subtitle: "YouGov EuroTrack 2023–2025 und Pew Global Attitudes 2025/2026"
+date: "`r format(Sys.Date(), '%d.%m.%Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.width = 9, fig.height = 5)
+library(dplyr); library(tidyr); library(readr); library(ggplot2)
+library(DescTools); library(lme4); library(lmerTest); library(performance); library(sjPlot)
+zahl <- function(x, d = 1) formatC(x, format = "f", digits = d, decimal.mark = ",")
+pwert <- function(p) if (p < 0.001) "p < 0,001" else paste0("p = ", formatC(p, format = "f", digits = 3, decimal.mark = ","))
+```
+
+# Daten und Vorgehen
+
+Die Werte stammen aus den veröffentlichten Tabellen von **YouGov EuroTrack** (Online-Panel, gewichtet; Wellen
+Oktober 2023 bis Mai 2025) und **Pew Global Attitudes** (Telefon-Zufallsstichproben; Frühjahr 2025 und 2026).
+Jede Zeile in `umfragen/umfragen_israel_palaestina.csv` nennt Quelle, Feldzeit und Fallzahl; alle Werte wurden
+automatisch gegen die PDF-Texte geprüft (0 Abweichungen). Näheres in `umfragen/README.md`.
+
+Die Methoden folgen den Tutorien *Statistik-Software mit R* (Kreuztabellen mit χ² und Cramers V, Anteils- und
+Korrelationstests, logistische Regression mit LR-Test und Pseudo-R², Mehrebenenanalyse mit ICC) und
+*Data Science mit R* (Logit, Modellvergleich). Interpretiert wird mit den Daumenregeln aus dem Tutorium
+(Cramers V: > 0,05 sehr schwach, > 0,10 schwach, > 0,20 mittelstark, > 0,40 stark, > 0,60 sehr stark;
+Pearsons r / Spearmans ρ: > 0,05 schwach, > 0,20 mittelstark, > 0,50 stark, > 0,70 sehr stark).
+
+**Wichtige Einschränkungen**
+
+1. **Aggregatdaten.** Wir haben keine Einzeldaten, sondern Prozentwerte je Land und Welle. Für die Tests werden
+   Fallzahlen rekonstruiert (Anteil × n). Das ist eine Näherung: Die Prozente sind gewichtet, die Fallzahlen
+   ungewichtet. Gewichtung vergrößert die Unsicherheit (Designeffekt). Pew nennt Designeffekte von 1,33 bis 2,18,
+   YouGov keine; Abschnitt 6 prüft deshalb, ob die Ergebnisse auch mit n / 1,7 halten.
+2. **Ökologischer Fehlschluss.** Zusammenhänge auf Länderebene (z. B. zwischen Umfrage und Medien) sagen nichts
+   darüber, ob *einzelne* Personen, die bestimmte Medien lesen, so denken.
+3. **Wenige Länder.** YouGov befragt 6–7, Pew 10 europäische Länder. Für Korrelationen und für die
+   Varianz zwischen Ländern in der Mehrebenenanalyse ist das sehr wenig (Faustregel: ≥ 20–30 Einheiten auf Ebene 2).
+4. **Frageformulierung.** YouGov fragt nach *Sympathie* für eine Seite des Konflikts, Pew nach der *Meinung über
+   Israel* als Staat. Das sind verwandte, aber nicht gleiche Konstrukte.
+
+```{r daten}
+u <- read_csv("umfragen/umfragen_israel_palaestina.csv", show_col_types = FALSE)
+sym <- u |>
+  filter(quelle == "YouGov EuroTrack", frage == "Sympathie im israelisch-palästinensischen Konflikt") |>
+  mutate(anzahl = round(prozent / 100 * n),
+         mitte  = as.Date(feld_von) + (as.Date(feld_bis) - as.Date(feld_von)) / 2,
+         monate = as.numeric(mitte - as.Date("2023-10-07")) / 30.44,      # Monate seit dem 7. Oktober 2023
+         welle  = factor(welle, levels = c("Okt. 2023", "Nov. 2023", "Juni 2024", "Mai 2025")),
+         antwort = factor(antwort, levels = c("israelische Seite", "palästinensische Seite", "beide gleich", "weiß nicht")))
+pew <- u |> filter(quelle == "Pew Global Attitudes")
+```
+
+# Beschreibung
+
+```{r abb-sympathie, fig.height = 6}
+sym |>
+  filter(antwort %in% c("israelische Seite", "palästinensische Seite")) |>
+  ggplot(aes(x = mitte, y = prozent, colour = antwort)) +
+  geom_line(linewidth = 0.8) + geom_point(size = 2) +
+  facet_wrap(~ land, ncol = 4) +
+  scale_colour_manual(values = c("israelische Seite" = "#2a78d6", "palästinensische Seite" = "#eb6834")) +
+  labs(x = NULL, y = "Anteil in %", colour = "Sympathie eher mit …",
+       title = "Sympathie im israelisch-palästinensischen Konflikt (YouGov EuroTrack)") +
+  theme_minimal() + theme(legend.position = "bottom")
+```
+
+```{r tab-sympathie}
+sym |>
+  filter(antwort %in% c("israelische Seite", "palästinensische Seite")) |>
+  select(land, welle, antwort, prozent) |>
+  pivot_wider(names_from = c(antwort, welle), values_from = prozent, names_sep = " · ") |>
+  knitr::kable(caption = "Anteile in % (leer: nicht erhoben)")
+```
+
+**Interpretation.** In allen Ländern verschiebt sich die Sympathie zwischen Oktober 2023 und Mai 2025 deutlich:
+Der Anteil mit Sympathie eher für die israelische Seite sinkt, der für die palästinensische Seite steigt.
+Am stärksten ist der Umschwung in **Deutschland** (israelische Seite 38 % → 17 %) und **Dänemark** (33 % → 18 %),
+die im Oktober 2023 am pro-israelischsten waren. In **Spanien** lag die palästinensische Seite ab November 2023 vorn (im Oktober 2023 noch knapp die
+israelische, 23 zu 21 %), in **Italien** schon bei der ersten Messung im November 2023. Im Mai 2025 sympathisieren in allen sechs Ländern mehr Menschen mit der palästinensischen als mit der
+israelischen Seite; in Deutschland ist der Abstand mit einem Prozentpunkt allerdings minimal. Der größte Teil der
+Befragten wählt jedoch weiterhin „beide gleich“ oder „weiß nicht“ (zusammen meist über 50 %).
+
+# Kreuztabellen und χ²-Test
+
+## Veränderung innerhalb der Länder
+
+H₀: Die Verteilung der Sympathie ist in der ersten und letzten Welle gleich.
+
+```{r chi-laender}
+chi_land <- sym |>
+  group_by(land) |>
+  group_modify(\(d, k) {
+    w <- d |> distinct(welle, mitte) |> arrange(mitte)
+    w <- as.character(w$welle[c(1, nrow(w))])
+    m <- d |> filter(welle %in% w) |> select(antwort, welle, anzahl) |>
+      pivot_wider(names_from = welle, values_from = anzahl)
+    mat <- as.matrix(m[, -1]); ch <- chisq.test(mat)
+    tibble(vergleich = paste(w, collapse = " → "), chi2 = unname(ch$statistic), df = unname(ch$parameter),
+           p = ch$p.value, cramer_v = CramerV(as.table(mat)), min_erwartet = min(ch$expected))
+  }) |> ungroup() |> arrange(desc(cramer_v))
+chi_land |> mutate(across(c(chi2, cramer_v), \(x) round(x, 3)), p = signif(p, 2), min_erwartet = round(min_erwartet)) |>
+  knitr::kable()
+```
+
+Beispiel als Kreuztabelle wie im Tutorium (`tab_xtab()`), Deutschland:
+
+```{r xtab-de}
+de <- sym |> filter(land == "Deutschland", welle %in% c("Okt. 2023", "Mai 2025"), anzahl > 0) |>
+  mutate(welle = droplevels(welle)) |> uncount(anzahl)
+tab_xtab(var.row = de$antwort, var.col = de$welle, show.col.prc = TRUE,
+         var.labels = c("Sympathie", "Welle"))
+```
+
+**Interpretation.** In sechs von sieben Ländern unterscheidet sich die Verteilung der Sympathie zwischen erster
+und letzter Welle signifikant (alle p < 0,001). Nach den Daumenregeln ist der Zusammenhang zwischen Zeitpunkt und
+Sympathie in **Deutschland** (V = `r zahl(chi_land$cramer_v[chi_land$land == "Deutschland"], 2)`) und
+**Dänemark** (V = `r zahl(chi_land$cramer_v[chi_land$land == "Dänemark"], 2)`) **mittelstark**, im Vereinigten
+Königreich, Frankreich, Spanien und Italien **schwach** (V zwischen 0,15 und 0,19). **Schweden** wurde nur im
+Oktober und November 2023 befragt; dort ist die Veränderung nicht signifikant (χ² = 6,9, df = 3, p = 0,076) und
+sehr schwach (V = 0,06) – in den ersten Kriegswochen gab es also noch keinen messbaren Umschwung.
+Die Voraussetzung des χ²-Tests ist überall erfüllt (kleinste erwartete Zellhäufigkeit ≥ 101).
+
+So berichtet: *Zwischen Oktober 2023 und Mai 2025 hat sich die Sympathieverteilung in Deutschland signifikant
+verändert (χ² = `r zahl(chi_land$chi2[chi_land$land == "Deutschland"], 1)`, df = 3, p < 0,001,
+Cramers V = `r zahl(chi_land$cramer_v[chi_land$land == "Deutschland"], 2)`).*
+
+## Unterschiede zwischen den Ländern (Mai 2025)
+
+```{r chi-mai25}
+m25 <- sym |> filter(welle == "Mai 2025") |> select(antwort, land, anzahl) |>
+  pivot_wider(names_from = land, values_from = anzahl)
+mat25 <- as.matrix(m25[, -1]); rownames(mat25) <- m25$antwort
+ch25 <- chisq.test(mat25); v25 <- CramerV(as.table(mat25))
+round(prop.table(mat25, 2) * 100, 1)
+```
+
+**Interpretation.** Im Mai 2025 unterscheiden sich die sechs Länder signifikant
+(χ² = `r zahl(ch25$statistic, 1)`, df = `r ch25$parameter`, `r pwert(ch25$p.value)`), der Zusammenhang ist aber
+nur **sehr schwach** (Cramers V = `r zahl(v25, 3)`). Die Unterschiede *zwischen* den Ländern sind damit kleiner als
+die Veränderung *innerhalb* der Länder über die Zeit: Die europäischen Öffentlichkeiten haben sich angenähert,
+vor allem weil die anfangs pro-israelischsten Länder (Deutschland, Dänemark) am stärksten umgeschwenkt sind.
+
+# Anteilsvergleiche (Zwei-Stichproben-Test für Anteile)
+
+Analog zum t-Test für Mittelwerte vergleicht `prop.test()` zwei Anteile; ausgegeben werden die Differenz in
+Prozentpunkten mit 95-%-Konfidenzintervall.
+
+```{r anteile}
+anteile <- sym |>
+  filter(antwort %in% c("israelische Seite", "palästinensische Seite")) |>
+  group_by(land, antwort) |> arrange(mitte, .by_group = TRUE) |>
+  group_modify(\(d, k) {
+    d <- d[c(1, nrow(d)), ]; pt <- prop.test(d$anzahl, d$n)
+    tibble(von = as.character(d$welle[1]), bis = as.character(d$welle[2]), anteil_von = d$prozent[1], anteil_bis = d$prozent[2],
+           diff_pp = 100 * (pt$estimate[2] - pt$estimate[1]), ki_unten = -100 * pt$conf.int[2], ki_oben = -100 * pt$conf.int[1], p = pt$p.value)
+  }) |> ungroup()
+anteile |> mutate(across(c(diff_pp, ki_unten, ki_oben), \(x) round(x, 1)), p = signif(p, 2)) |> knitr::kable()
+```
+
+**Interpretation.** Alle Veränderungen von Oktober/November 2023 bis Mai 2025 sind signifikant (p < 0,001); kein
+Konfidenzintervall schließt die 0 ein. Der Anteil mit Sympathie für die israelische Seite sinkt um 5 (Vereinigtes
+Königreich) bis 21 Prozentpunkte (Deutschland), der für die palästinensische Seite steigt um 8 (Deutschland) bis
+16 Prozentpunkte (Dänemark). In Deutschland kommt der Umschwung also vor allem aus einem Rückgang der
+pro-israelischen Sympathie, weniger aus einem Zuwachs auf palästinensischer Seite: Viele wechseln zu „beide gleich“
+oder „weiß nicht“. Nur in Schweden (lediglich Okt.→Nov. 2023) sind die Unterschiede nicht signifikant.
+
+## Pew: negative Meinung über Israel 2025 → 2026
+
+Für Pew 2026 sind die Fallzahlen je Land nicht veröffentlicht; angenommen werden 1.000 Befragte und die
+Designeffekte von 2025. Getestet wird mit der **effektiven Fallzahl** n / Designeffekt.
+
+```{r pew-test}
+pew_neg <- pew |> filter(frage == "Meinung über Israel", antwort == "negativ") |>
+  select(land, welle, prozent, n, deff) |> group_by(land) |> mutate(deff = first(na.omit(deff))) |> ungroup()
+pew_test <- pew_neg |>
+  pivot_wider(names_from = welle, values_from = c(prozent, n)) |>
+  mutate(n26 = 1000, n_eff25 = `n_Frühjahr 2025` / deff, n_eff26 = n26 / deff) |>
+  rowwise() |>
+  mutate(pt = list(prop.test(round(c(`prozent_Frühjahr 2025`, `prozent_Frühjahr 2026`) / 100 * c(n_eff25, n_eff26)),
+                             round(c(n_eff25, n_eff26)))),
+         diff_pp = `prozent_Frühjahr 2026` - `prozent_Frühjahr 2025`, p = pt$p.value) |>
+  ungroup() |> select(land, `2025` = `prozent_Frühjahr 2025`, `2026` = `prozent_Frühjahr 2026`, diff_pp, deff, p) |>
+  arrange(desc(diff_pp))
+pew_test |> mutate(p = round(p, 3)) |> knitr::kable()
+```
+
+**Interpretation.** Der Anteil mit negativer Meinung über Israel steigt signifikant in **Deutschland** und
+**Italien** (je +9 Prozentpunkte), **Polen** und dem **Vereinigten Königreich** (je +8; alle p < 0,01).
+In **Griechenland** sinkt er signifikant (−7, p = 0,018) – als einziges Land. In Frankreich (+5, p = 0,074),
+Spanien, Schweden, den Niederlanden und Ungarn ist die Veränderung nicht signifikant; Spanien, Schweden und die
+Niederlande lagen aber schon 2025 bei 75–78 %, dort ist wenig Spielraum nach oben (Deckeneffekt).
+Da die Fallzahlen für 2026 angenommen sind, sind die p-Werte für 2026 Näherungen.
+
+# Logistische Regression (gruppierte Daten)
+
+Abhängige Variable: Sympathie eher mit der israelischen Seite (ja/nein), als gruppierte Binomialdaten
+(`cbind(ja, nein)`). Unabhängige Variablen: Zeit in Monaten seit dem 7. Oktober 2023 und Land (Dummies,
+Referenz Deutschland). Modell 3 lässt den Zeittrend je Land variieren (Interaktion).
+
+```{r logit}
+isr <- sym |> filter(antwort == "israelische Seite") |> mutate(rest = n - anzahl, land = relevel(factor(land), "Deutschland"))
+m0 <- glm(cbind(anzahl, rest) ~ land, family = binomial, data = isr)
+m1 <- glm(cbind(anzahl, rest) ~ monate + land, family = binomial, data = isr)
+m2 <- glm(cbind(anzahl, rest) ~ monate * land, family = binomial, data = isr)
+or_m1 <- exp(cbind(OR = coef(m1), confint.default(m1)))
+round(or_m1, 3)
+anova(m0, m1, m2, test = "Chisq")
+# Pseudo-R² auf Einzeldatenebene (bei gruppierten Daten enthält logLik() eine Konstante, die McFadden verzerrt)
+ll_ind <- function(m) { p <- fitted(m); d <- m$data; sum(d$anzahl * log(p) + d$rest * log(1 - p)) }
+mnull <- glm(cbind(anzahl, rest) ~ 1, family = binomial, data = isr)
+mcf <- 1 - sapply(list(m0 = m0, m1 = m1, m2 = m2), ll_ind) / ll_ind(mnull)
+round(rbind(McFadden = mcf, AIC = AIC(m0, m1, m2)$AIC), 3)
+lr01 <- anova(m0, m1, test = "Chisq"); lr12 <- anova(m1, m2, test = "Chisq")
+or6 <- exp(6 * coef(m1)["monate"]); or6_ki <- exp(6 * confint.default(m1)["monate", ])
+```
+
+```{r logit-pal}
+pal <- sym |> filter(antwort == "palästinensische Seite") |> mutate(rest = n - anzahl, land = relevel(factor(land), "Deutschland"))
+p1 <- glm(cbind(anzahl, rest) ~ monate + land, family = binomial, data = pal)
+p2 <- glm(cbind(anzahl, rest) ~ monate * land, family = binomial, data = pal)
+lrp12 <- anova(p1, p2, test = "Chisq")
+orp6 <- exp(6 * coef(p1)["monate"]); orp6_ki <- exp(6 * confint.default(p1)["monate", ])
+c(OR_6_Monate = orp6, orp6_ki)
+```
+
+**Interpretation.**
+
+- **Zeittrend israelische Seite:** Pro Monat sinkt die Chance (Odds), mit der israelischen Seite zu sympathisieren,
+  um den Faktor `r zahl(or_m1["monate", "OR"], 3)` – über **sechs Monate** auf das
+  `r zahl(or6, 2)`-Fache (95-%-KI `r zahl(or6_ki[1], 2)` bis `r zahl(or6_ki[2], 2)`), also um rund
+  `r round(100 * (1 - or6))` %, unter Kontrolle des Landes. Die Zeit verbessert das Modell signifikant
+  (LR-Test: χ² = `r zahl(lr01$Deviance[2], 1)`, df = 1, `r pwert(lr01[2, "Pr(>Chi)"])`; AIC sinkt von
+  `r round(AIC(m0))` auf `r round(AIC(m1))`).
+- **Unterschiedliche Trends:** Die Interaktion Zeit × Land verbessert das Modell ebenfalls signifikant
+  (χ² = `r zahl(lr12$Deviance[2], 1)`, df = `r lr12$Df[2]`, `r pwert(lr12[2, "Pr(>Chi)"])`): Der Rückgang der
+  pro-israelischen Sympathie verläuft **nicht in allen Ländern gleich schnell** – am steilsten in Deutschland und
+  Dänemark (siehe Abbildung).
+- **Zeittrend palästinensische Seite:** Die Chance steigt über sechs Monate um den Faktor `r zahl(orp6, 2)`
+  (KI `r zahl(orp6_ki[1], 2)`–`r zahl(orp6_ki[2], 2)`). Hier ist die Interaktion **nicht** signifikant
+  (χ² = `r zahl(lrp12$Deviance[2], 1)`, df = `r lrp12$Df[2]`, `r pwert(lrp12[2, "Pr(>Chi)"])`): Die Zuwendung zur
+  palästinensischen Seite wächst in allen Ländern ähnlich schnell; die Länder unterscheiden sich vor allem im
+  Rückgang der pro-israelischen Haltung.
+- **Pseudo-R²:** McFadden liegt nur bei `r zahl(mcf["m1"], 3)`. Das ist kein Widerspruch: Zeit und Land erklären
+  die *Unterschiede zwischen Personen* kaum (die meisten wählen ohnehin „beide gleich“ oder „weiß nicht“), der
+  *Trend im Aggregat* ist aber eindeutig. Pseudo-R² nicht als erklärte Varianz lesen (Tutorium, Kap. 15.3).
+
+# Mehrebenenanalyse: Wellen in Ländern
+
+Die Wellen sind in Ländern geschachtelt. Wie im Tutorium (Kap. 16) zuerst das Nullmodell mit ICC, dann
+Random Intercept und Random Slope. Zusätzlich linear mit dem **Sympathie-Saldo**
+(palästinensische minus israelische Seite in Prozentpunkten) als abhängiger Variable.
+
+```{r mehrebenen}
+g0 <- glmer(cbind(anzahl, rest) ~ 1 + (1 | land), data = isr, family = binomial)
+v0 <- as.numeric(VarCorr(g0)$land); icc_logit <- v0 / (v0 + pi^2 / 3)       # latente ICC (logistisch)
+g1 <- glmer(cbind(anzahl, rest) ~ monate + (1 | land), data = isr, family = binomial)
+g2 <- glmer(cbind(anzahl, rest) ~ monate + (1 + monate | land), data = isr, family = binomial)
+lr_slope <- anova(g1, g2)
+saldo <- sym |> select(land, welle, monate, antwort, prozent) |>
+  pivot_wider(names_from = antwort, values_from = prozent) |>
+  mutate(saldo = `palästinensische Seite` - `israelische Seite`) |> filter(!is.na(saldo))
+l0 <- lmer(saldo ~ 1 + (1 | land), data = saldo); icc(l0)
+l1 <- lmer(saldo ~ monate + (1 | land), data = saldo); summary(l1)$coefficients
+lr_slope
+```
+
+**Interpretation.**
+
+- **ICC.** Im logistischen Nullmodell liegen `r round(100 * icc_logit)` % der (latenten) Varianz zwischen den
+  Ländern – genau an der Faustregel-Schwelle von 0,05. Beim Saldo sind es `r round(100 * icc(l0)$ICC_adjusted)` %:
+  Die Länder unterscheiden sich im *Niveau* des Saldos deutlich, auch wenn sich die Sympathie in allen Ländern
+  in dieselbe Richtung bewegt.
+- **Random Intercept.** Der Saldo steigt im Mittel um `r zahl(fixef(l1)["monate"], 2)` Prozentpunkte pro Monat
+  (`r pwert(summary(l1)$coefficients["monate", 5])`), also um rund `r round(12 * fixef(l1)["monate"])`
+  Prozentpunkte pro Jahr zugunsten der palästinensischen Seite.
+- **Random Slope.** Ein je Land eigener Zeittrend verbessert das Modell signifikant
+  (χ² = `r zahl(lr_slope$Chisq[2], 1)`, df = 2, `r pwert(lr_slope[2, "Pr(>Chisq)"])`) – das bestätigt die
+  signifikante Interaktion in der logistischen Regression.
+- **Vorsicht:** Mit nur 7 Ländern auf Ebene 2 sind die Varianzschätzungen sehr unsicher (Faustregel: ≥ 20–30
+  Einheiten). Die Mehrebenenanalyse dient hier als Plausibilitätsprüfung, nicht als belastbare Schätzung der
+  Ländervarianz.
+
+# Zusammenhang zwischen den Umfragen (Länderebene)
+
+Messen YouGov und Pew dasselbe? Verglichen werden Länder, die in beiden enthalten sind (n = 5).
+
+```{r korrelation}
+k <- saldo |> filter(welle == "Mai 2025") |> select(land, saldo) |>
+  inner_join(pew_neg |> filter(welle == "Frühjahr 2025") |> select(land, pew_negativ = prozent), by = "land") |>
+  inner_join(u |> filter(frage == "Israels Angriff auf Gaza seit Okt. 2023 gerechtfertigt?", antwort == "nicht gerechtfertigt",
+                         welle == "Mai 2025") |> select(land, gaza_nicht_gerechtfertigt = prozent), by = "land")
+k
+r1 <- cor.test(k$saldo, k$pew_negativ); r1s <- cor.test(k$saldo, k$pew_negativ, method = "spearman", exact = FALSE)
+r2 <- cor.test(k$gaza_nicht_gerechtfertigt, k$pew_negativ)
+r1; r2
+```
+
+**Interpretation.** Zwischen YouGov-Saldo (Mai 2025) und negativer Meinung bei Pew (Frühjahr 2025) besteht ein
+**mittelstarker** positiver Zusammenhang (r = `r zahl(r1$estimate, 2)`, `r pwert(r1$p.value)`; Spearman
+ρ = `r zahl(r1s$estimate, 2)`), zwischen „Angriff auf Gaza nicht gerechtfertigt“ und negativer Meinung ein
+**starker** (r = `r zahl(r2$estimate, 2)`, `r pwert(r2$p.value)`). Beide sind **nicht signifikant** – bei fünf
+Ländern ist das zu erwarten; das Konfidenzintervall für r reicht von `r zahl(r2$conf.int[1], 2)` bis
+`r zahl(r2$conf.int[2], 2)`. Die Richtung spricht dafür, dass beide Institute ähnliche Haltungen messen;
+belastbar ist das mit fünf Fällen nicht. Auffällig: Deutschland hat den niedrigsten Saldo, liegt bei Pew aber
+im Mittelfeld – „Sympathie mit einer Konfliktpartei“ und „Meinung über Israel“ sind eben verschiedene Fragen.
+
+# Robustheit: Gewichtung und Überdispersion
+
+```{r robustheit}
+# 1. Effektive Fallzahl n / 1,7 (etwa der mittlere Pew-Designeffekt)
+isr_eff <- isr |> mutate(anzahl = round(anzahl / 1.7), rest = round(rest / 1.7))
+m1_eff <- glm(cbind(anzahl, rest) ~ monate + land, family = binomial, data = isr_eff)
+m2_eff <- glm(cbind(anzahl, rest) ~ monate * land, family = binomial, data = isr_eff)
+lr_eff <- anova(m1_eff, m2_eff, test = "Chisq")
+# 2. Überdispersion: quasibinomial
+dispersion <- sum(residuals(m1, type = "pearson")^2) / df.residual(m1)
+m1_q <- glm(cbind(anzahl, rest) ~ monate + land, family = quasibinomial, data = isr)
+c(Dispersion = dispersion,
+  p_Zeit_quasibinomial = summary(m1_q)$coefficients["monate", 4],
+  p_Interaktion_n_eff = lr_eff[2, "Pr(>Chi)"])
+```
+
+**Interpretation.** Die Daten sind **überdispers** (Dispersionsparameter `r zahl(dispersion, 1)` statt 1): Die
+Wellen schwanken stärker, als es ein reines Stichprobenmodell erwartet – plausibel bei Online-Panels mit
+Gewichtung und echten Ereignissen zwischen den Wellen. Die Standardfehler der Binomialmodelle sind deshalb zu
+klein. Der **Zeittrend bleibt aber auch im quasibinomialen Modell hochsignifikant**
+(`r pwert(summary(m1_q)$coefficients["monate", 4])`), und die **Interaktion Zeit × Land** bleibt mit effektiver
+Fallzahl n / 1,7 signifikant (`r pwert(lr_eff[2, "Pr(>Chi)"])`). Die Kernaussagen hängen also nicht an der
+Annahme ungewichteter Zufallsstichproben; die exakten p-Werte schon.
+
+# Was nicht gerechnet wurde, und warum
+
+- **PCA / Clusteranalyse der Länder** (Data Science, Kap. 6–7): Mit 6–10 Ländern und wenigen Variablen
+  entstehen keine stabilen Dimensionen oder Typen; die Ergebnisse würden von einzelnen Ländern bestimmt.
+- **Machine Learning:** Es gibt keine Einzeldaten, also nichts zu klassifizieren.
+- **Medien vs. Bevölkerung:** Der Vergleich (Medien-Frames ± 45 Tage um die Feldzeit) läuft im Live-Dashboard
+  mit, sobald genug Artikel aus den passenden Zeiträumen übersetzt sind. Dann sinnvoll: Mehrebenenmodell mit
+  Artikeln in Land-Wellen (z. B. `glmer(frame ~ saldo + (1 | land))`), mit dem Hinweis auf den ökologischen
+  Fehlschluss.
+
+# Fazit
+
+1. Zwischen Oktober 2023 und Mai 2025 hat sich die Sympathie in allen untersuchten westeuropäischen Ländern
+   **signifikant von der israelischen zur palästinensischen Seite verschoben** (Cramers V 0,15–0,25).
+2. Der Umschwung ist **in den anfangs pro-israelischsten Ländern am stärksten** (Deutschland, Dänemark); die Länder
+   haben sich dadurch angenähert (Ländervergleich Mai 2025: V = `r zahl(v25, 2)`, sehr schwach).
+3. Die **Zuwendung zur palästinensischen Seite wächst überall ähnlich schnell**, der Rückgang der pro-israelischen
+   Sympathie unterscheidet sich zwischen den Ländern.
+4. Von 2025 auf 2026 (Pew) wird die Meinung über Israel in Deutschland, Italien, Polen und dem Vereinigten
+   Königreich signifikant negativer; in Griechenland als einzigem Land positiver.
+5. Für Vergleiche mit den Medien gilt: Aggregatzusammenhänge, wenige Länder, Überdispersion – Ergebnisse
+   beschreibend und vorsichtig formulieren.
+
+**Quellen:** YouGov EuroTrack, Tabellen Nov./Dez. 2023 und Mai 2025; Pew Research Center, Global Attitudes Survey
+2025 und 2026 (Topline und Methodik). URLs je Zeile in `umfragen/umfragen_israel_palaestina.csv`.

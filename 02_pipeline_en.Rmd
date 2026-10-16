@@ -1,0 +1,911 @@
+---
+title: "Master's Thesis – Full Pipeline"
+subtitle: "Israel–Palestine in 22 European Media Systems: Data Collection, Translation, Analysis"
+author: "Vincent"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+---
+
+```{r knitr-setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+# The code lives in the scripts under R/ (functions) and skripte/ (actions).
+# read_chunk() reads the sections marked "## ---- name ----"; each empty chunk below with
+# the same name displays and runs that section.
+for (f in list.files(c("R", "skripte"), pattern = "\\.R$", full.names = TRUE)) knitr::read_chunk(f)
+```
+
+# How This Document Works
+
+This document describes **step by step how we proceed** and shows the corresponding code.
+The code itself lives in **scripts**, one per module:
+
+| Folder | Contents | Loaded … |
+|---|---|---|
+| `R/` | Functions and settings (`00_setup.R` … `70_validierung.R`) | automatically, via `source("R/laden.R")` |
+| `skripte/` | Actions: import, translation setup, analyses, validation | manually only |
+
+Script sections are marked with `## ---- name ----`. This document pulls them in via
+`knitr::read_chunk()`: each code chunk below shows exactly the section of the same name. When a
+script changes, this document is up to date the next time it is knitted. The code therefore
+lives in **one place only**.
+Long-running R processes keep the outlet configuration loaded from startup. If outlets are added
+while one is already running, `Rscript skripte/b3_import_aufstockung.R` imports those sources with
+separate progress markers and without loading a second GPU model.
+
+There are two kinds of code chunks:
+
+| Kind | Recognisable by | What happens when knitting? |
+|---|---|---|
+| **Function and configuration chunks** | no `eval = FALSE` | run: they define settings and functions |
+| **Action chunks** (import, translation, analyses) | `eval = FALSE` | **not** run automatically |
+
+You run action chunks **manually** in RStudio (cursor in the chunk, `Ctrl + Shift + Enter`;
+RStudio ignores `eval = FALSE` here). This way, knitting the document can never accidentally
+start a job that runs for hours or costs money.
+
+The **nightly run** (Section 7) loads all functions via `source("R/laden.R")` and then works
+through pending translations.
+
+## The Workflow at a Glance
+
+1. **Configuration:** countries, outlets, periods
+2. **Database:** a single SQLite file holds all articles and translations, including their status
+3. **Data collection:** read Nexis exports, add scraper output (e.g. the tagesschau pilot)
+4. **Preprocessing:** assign periods, cut title/lead/half page, coarse filter, duplicates
+5. **Local translation (NLLB):** all titles and leads, then the half page
+6. **Translation cross-check (planned):** a second local model (HY-MT2, not installed yet) translates a sample, no cloud service involved
+7. **Staged nightly run**
+8. **Fine-grained relevance filter** in English
+9. **Analysis corpus and DTM**
+10. **Dictionaries and keywords in context**
+11. **Structural topic model**
+12. **Source attribution** (all countries)
+13. **Validation:** relevance, sources, translation quality
+
+> **Core methodological decision on translation:** The main analysis uses the local NLLB
+> translation for **all** countries. Every country thus passes through the same translation
+> engine, so cross-country differences are not artefacts of different translators.
+> UK and Irish articles enter in their English original. A second, locally run translation model
+> (planned: HY-MT2) translates a sample as a **cross-check**: if the English versions hardly differ,
+> machine translation is not a problem. De Vries, Schoonvelde and Schumacher (2018, *Political
+> Analysis*; page still to be verified) show that machine translation is adequate for
+> bag-of-words methods.
+
+---
+
+# Setup
+
+## Packages
+
+| Package | Purpose |
+|---|---|
+| `DBI`, `RSQLite` | Database: articles and translations with status |
+| `httr2`, `jsonlite` | Web requests (scraper, Media Cloud) |
+| `reticulate` | Calling Python from R, for the local translation model |
+| `LexisNexisTools` | Reading Nexis Uni exports (.docx/.rtf) |
+| `dplyr`, `tidyr`, `purrr`, `stringr`, `readr`, `lubridate`, `tibble` | Data management |
+| `quanteda`, `quanteda.textstats` | Corpus, tokens, DTM, dictionaries, KWIC |
+| `stm` | Structural topic model |
+| `irr` | Krippendorff's alpha for validation |
+| `taskscheduleR` | Windows Task Scheduler from R (Windows only) |
+| `future`, `furrr`, `parallelly` | Parallel computing across multiple CPU cores |
+| `rvest`, `xml2` | Parsing HTML pages and sitemaps (custom scrapers) |
+| `paperboy` (GitHub) | Ready-made parsers for many news sites (J. B. Gruber and others) |
+| `cld2` | Language detection as a check (Google's Compact Language Detector) |
+
+```{r pakete}
+```
+
+## Folders and Secret Keys
+
+All data live under `data/`. This folder is excluded from the repository via `.gitignore`,
+because **the full-text corpus must not be published** (§ 60d UrhG, the German copyright
+provision for text and data mining; outlets' terms of use).
+
+Never write the **Media Cloud key** (optional, section “Scraping All Countries”) into the code. Put it in
+the file `.Renviron` in the project folder (also listed in `.gitignore`):
+
+```
+MEDIACLOUD_API_KEY=dein-schluessel-hier
+```
+
+Then restart R. `Sys.getenv("MEDIACLOUD_API_KEY")` will read it.
+
+```{r ordner}
+```
+
+## Parallel Computing
+
+Your machine has several CPU cores, but R uses only one by default. The packages `future` and
+`furrr` distribute work across several **workers**: independent R processes running in the
+background (`multisession` mode, which also works on Windows).
+
+**Where it pays off and where it does not:**
+
+| Step | Parallel? | Why |
+|---|---|---|
+| Preprocessing (cutting lead/half page) | yes | purely CPU-bound, many articles |
+| Sentence-level source attribution analysis | yes | many sentences, independent of each other |
+| quanteda (tokens, DTM, dictionaries) | yes | quanteda uses its own threads |
+| STM: testing several K (`searchK`) | yes | each K is a separate model |
+| Scraping **several outlets** | yes | one worker per outlet, pauses are kept |
+| Scraping **within one outlet** | **no** | courtesy pauses, otherwise we risk being blocked |
+| Translation (NLLB) | **no** | runs on the GPU, where batch size is what helps |
+
+**Costs:** Each worker receives a **copy** of the data it needs. This costs start-up time and
+memory, so for small tasks parallel execution is actually slower. The functions below
+therefore switch to parallel mode only for larger amounts of data.
+
+By default, `kerne` (cores) leaves **2 cores free** so the PC stays usable during long runs.
+On a Ryzen 7 5800X3D (16 threads), that means 14 workers.
+
+```{r parallel}
+```
+
+---
+
+# Configuration
+
+All research design decisions are kept here **in one place**. If you swap an outlet or shift
+a period, for example, you only change this section.
+
+## Countries
+
+All countries in the sample are on the same level. There is no ranking by importance, and all
+analyses, including the source analysis, cover all countries.
+
+For an overview of the available data, we first collect **6 national outlets each in all 28 countries
+(EU27 + UK)**. Which of them enter the analysis will be decided in light of the data
+available; the justification for the selection is still outstanding.
+
+```{r laender}
+```
+
+## Languages and Language Codes
+
+Each language needs a code for **NLLB** (local model, format `xxx_Script`). Language is tied to the **outlet**, not the country, because Belgium, for example,
+has outlets in Dutch and in French.
+
+```{r sprachen}
+```
+
+## Outlets
+
+Six national outlets per country: at least one public broadcaster, the rest private, spread across
+the political spectrum where possible. Each sixth outlet is exploratory and remains unclassified
+(`unklar`) until its orientation is documented. The columns:
+
+| Column | Meaning |
+|---|---|
+| `traeger` (ownership) | `oeffentlich-rechtlich` (public broadcaster) or `privat` (private) |
+| `ausrichtung` (orientation) | provisional placement from left … right; before the exposé, back it up with the Media Pluralism Monitor or the Reuters Digital News Report |
+| `typ`, `paywall` | quality newspaper, tabloid, broadcaster, online; paywall yes/partial/no |
+| `zugang` (access) | best route to the full texts: `nexis`, `wiso`, `paperboy` (ready-made parser) or `scraper` |
+| `sammler` (collector) | how the article URLs are found: own archive scraper (`tagesschau`, `guardian`, `err`) or generic (`sitemap`) |
+
+We compared the original 140 national outlets against the source lists of Nexis Uni and wiso on
+07.10.2026. The 28 additions are assigned to the scraper for now; Nexis
+and wiso coverage has not been rechecked for them. First run
+`Rscript skripte/b2_alle_scrapen.R aufstockung-nur-urls 0` to collect Sitemaps and Media Cloud
+URLs sequentially using source-specific caches. If Media Cloud is queried as a separate job, let it
+finish, then merge its results into the existing URL lists with
+`Rscript skripte/b2_alle_scrapen.R aufstockung-nur-mc 0` (without crawling Sitemaps again). Then
+fetch full texts sequentially with
+`Rscript skripte/b2_alle_scrapen.R aufstockung-nur-volltexte 0`. Articles of licensed outlets and
+of outlets that do not allow automated retrieval are exported from Nexis Uni (see
+`nexis/README.md`). Paywalls are not bypassed.
+
+```{r medien}
+```
+
+## Periods and Control Sample
+
+We do not collect continuously but in **six event periods** (F1–F6) around key events. On
+import, each article receives its code in the variable `zeitraum` (period): F1–F6, or K for
+control days. Together with `land` (country), this is the second central comparison variable:
+differences between periods show how coverage changes with events; differences between
+countries show how much coverage diverges at the same point in time. **Check the dates
+against a chronology before submitting the exposé.**
+
+In addition, there is a **control sample from routine periods**: constructed weeks. For each
+constructed week, one random Monday, Tuesday … Sunday is drawn from the full study period,
+but only from days **outside** the event periods. The sample thus reflects the weekly rhythm
+of news coverage without being dominated by peak phases. The fixed `seed` makes the draw
+reproducible.
+
+```{r zeitraeume}
+```
+
+## Per-Outlet Glossary
+
+NLLB mistranslates some names, either because they are also ordinary words in the source
+language (Estonian “Saks” is a surname but also means “German”), or because they are proper
+names that should not be translated (the ERR news programme “Aktuaalne kaamera” became
+“Current Camera”). The glossary defines **per outlet** which terms are replaced by a
+placeholder before translation and reinserted in a fixed form afterwards (see the NLLB
+section).
+
+- `muster` (pattern): regular expression in the **original** (cover inflected forms with `\\w*`)
+- `englisch` (English): fixed form in the translation
+- `medium = "*"`: applies to all outlets
+
+The glossary grows with validation: whenever a name is repeatedly mistranslated in the
+output, it is added here.
+
+```{r glossar}
+```
+
+## Text and Translation Parameters
+
+- **`lead_zeichen`** (lead characters): the “lead” is the first ~400 characters, trimmed to
+  the end of a sentence. Not every source has its own lead field, so this keeps the
+  definition consistent across sources.
+- **`halbseite_zeichen`** (half-page characters): ~1,500 characters, roughly half an A4 page.
+- **`validierung_n`**: number of articles that a second local model additionally translates (cross-check).
+
+```{r parameter}
+```
+
+---
+
+# Database
+
+## Why a Database Instead of CSV Files?
+
+The pipeline runs for weeks in many small steps. Each step needs to know **what has already
+been done**. An SQLite database is a single file (`data/korpus.sqlite`), needs no server, and
+can be read and written by several sessions in turn. If a run aborts, everything up to the
+last saved batch is preserved.
+
+Three tables:
+
+| Table | Contents |
+|---|---|
+| `artikel` | one record per article: metadata, original text, lead, half page, filter status |
+| `uebersetzung` | one row per translated field and engine (`titel`/`lead`/`halbseite` × `nllb`; the cross-check later uses `hymt2`) |
+| `lauf_log` | log of every nightly run: when, what, how many characters |
+
+```{r db-funktionen}
+```
+
+---
+
+# Data Collection
+
+## Common Format
+
+Regardless of its origin, every article is converted into the same format and written to the
+database through **one** function. This step also performs all preprocessing (Section 5).
+`INSERT OR IGNORE` ensures that an article imported twice is stored only once. The ID is a
+hash of outlet, date and title, so it stays stable across imports.
+
+```{r funktion-import}
+```
+
+## Nexis Uni
+
+For most newspapers, Nexis Uni is the access point. Procedure in the database:
+
+1. Search per outlet and period, e.g. `Gaza OR Israel OR Palästin* OR Hamas OR Westjordanland`
+   in the respective national language (document the search strings per language; they belong
+   in the methods chapter!).
+2. Export hits in batches as **.docx** (Nexis Uni limits the number per download).
+3. Store the files under `data/raw/nexis/<Land>/<Medium>/`.
+
+The package `LexisNexisTools` reads these exports and separates metadata (newspaper, date,
+title) from the text. The newspaper name in Nexis often differs from ours, e.g.
+“The Guardian (London)”. The table `nexis_namen` (Nexis names) maps these; after the first
+import, add the names the script reports as “nicht in der Konfiguration” (“not in the
+configuration”).
+
+```{r funktion-nexis}
+```
+
+```{r nexis-import, eval = FALSE}
+```
+
+## Custom Scrapers
+
+Each scraper returns a CSV with the columns `medium, datum, titel, text, url` and stores it
+under `data/raw/scraper/` (the tagesschau pilot under `data/processed/`). Three are finished
+and tested:
+
+### tagesschau.de (`R/11_scraper_tagesschau.R`)
+
+The **monthly archive** (`tagesschau.de/archiv?datum=JJJJ-MM-01&pageIndex=N`) lists all items
+of a month, about 500 entries across 4–5 pages. The search interface reaches back only about
+four weeks and is therefore unsuitable. Full texts are in `p.textabsatz` and
+`h2.meldung__subhead`. We exclude live blogs (those before October 2024 have been depublished
+anyway). Details: `01_pilot_tagesschau.Rmd`.
+
+```{r tagesschau-archiv}
+```
+
+```{r tagesschau-volltext}
+```
+
+### The Guardian (`R/12_scraper_guardian.R`)
+
+Each tag has a **daily archive**
+(`theguardian.com/world/israel-hamas-war/2023/oct/10/all`). We collect the links for the tags
+war, Gaza and West Bank and keep only articles and comment pieces. Live blogs, videos, audio
+and galleries are dropped. `medium_scrapen()` (below) fetches the full texts. The text is in
+`div.article-body-commercial-selector`, the date in the meta tag `article:published_time`. In
+the research design, the Guardian comes via Nexis; the scraper serves as a supplement and
+cross-check.
+
+```{r guardian-funktionen}
+```
+
+### ERR, Estonia (`R/13_scraper_err.R`)
+
+err.ee loads its lists through a **JSON interface**. We combine the **daily list of all news
+items** (`/api/category/latest/109`, coarse filter on title and lead) with the **search**
+(`/api/search/getContents/`, several Estonian word forms). In testing, the daily list added
+only 3 articles beyond the search. The text is in `article.prime div.text p`.
+
+```{r err-funktionen}
+```
+
+### Importing the Results
+
+```{r scraper-import, eval = FALSE}
+```
+
+## Scraping Several Outlets in Parallel
+
+For freely accessible outlets without Nexis access. `medium_scrapen()` (scrape outlet) fetches
+the articles of **one** outlet sequentially, with pauses and a cache. `mehrere_medien_scrapen()`
+(scrape several outlets) starts a separate worker for each outlet. ERR, LSM and LRT, for
+example, thus run simultaneously, while each site is still queried only every `pause` seconds.
+
+Each outlet needs a URL list and the CSS selectors for title, date and text. You have to
+identify these for each site in the browser (right-click → “Inspect”) and test them on a few
+articles. The result is saved as a CSV in `data/raw/scraper/` and imported into the database
+with the “scraper-import” chunk.
+
+```{r funktion-scraper}
+```
+
+```{r scraper-parallel-beispiel, eval = FALSE}
+```
+
+In an early test run with three countries, the Guardian and ERR ran in
+parallel this way, with these selectors:
+
+| Outlet | `selektor_text` | `selektor_titel` | Date |
+|---|---|---|---|
+| The Guardian | `div.article-body-commercial-selector > p, … > h2` | `h1` | `meta[property='article:published_time']`, attribute `content` |
+| ERR | `article.prime div.text p` | `article.prime h1` | from the search interface |
+
+## Scraping All Countries
+
+For 168 national outlets plus regional and other sources you cannot look for archives and CSS selectors by hand. The generic scraper
+(`R/14_url_sammler.R`, `R/15_volltext.R`, `R/16_alle_medien.R`) does this automatically, in
+three steps per outlet.
+
+**1. Find article URLs.** Three routes, whose results are combined:
+
+- **Own archive scrapers** for tagesschau, the Guardian and ERR (see above).
+- **Sitemaps:** Almost every news site publishes a list of all its article URLs for search
+  engines, usually split by month or day. Where it lives is stated in the `robots.txt`. We read
+  only the sub-sitemaps whose name or modification date falls within our period.
+- **Media Cloud** (optional): a freely usable news archive with full-text search. With a free
+  account on search.mediacloud.org and the key in `.Renviron` (`MEDIACLOUD_API_KEY=…`), the
+  scraper additionally searches there for articles on the conflict. This helps with sites whose
+  URLs contain no keywords (e.g. only an article number).
+  Because Media Cloud only allows about 10 requests per minute per account, we query it **once
+  up front** for all outlets together, and only for the study periods F1–F6 (month by month)
+  and the control days (`mc_fenster()`, `mc_alle_urls()`) and then assign the hits to the outlets by domain. Every finished month is
+  saved (`data/raw/urls/_mediacloud/`), so an interrupted run resumes there.
+
+The other URLs are also kept only if their date falls within a study period or on a control
+day (or is unknown).
+
+**2. Coarse filtering.** The sitemaps return all articles, including sport and weather. We
+fetch only those whose URL (or sitemap title) points to the conflict (`url_relevanz_regex`,
+multilingual, including transliterated forms such as the Greek “israil”). This is generous:
+whatever slips through here is caught by the coarse filter on the text later. What the URL does
+not reveal, we find only via Media Cloud or the archive scrapers.
+
+**3. Fetch and parse full texts.** One outlet at a time with a pause, all outlets in parallel.
+Each page is saved once (`data/raw/html/<Medium>/`); an interrupted run resumes there on the
+next start. When parsing, we try three routes and take the longest usable text: the matching
+**paperboy** parser (if one exists for the domain), **JSON-LD** (a machine-readable article
+description that many sites embed for search engines) and general rules (`article p`,
+`main p`).
+
+**Rules the scraper follows:**
+
+- If the `robots.txt` blocks all crawlers, we skip the outlet; blocked paths are not fetched.
+  A specified `Crawl-delay` is honoured.
+- Paywalls are not circumvented. If a text is only a teaser, `paywall_hinweis` (paywall note)
+  flags it; these outlets come via Nexis or wiso.
+- The user agent states purpose and contact (`kontakt` in `R/10_scraper_allgemein.R`).
+- Nexis and wiso are not queried automatically (licence terms). There we export by hand, in
+  batches.
+
+```{r url-grundlagen}
+```
+
+```{r robots}
+```
+
+```{r sitemaps}
+```
+
+```{r url-relevanz}
+```
+
+```{r mediacloud}
+```
+
+```{r spezial-sammler}
+```
+
+```{r volltext-holen}
+```
+
+```{r volltext-parsen}
+```
+
+```{r medium-sammeln}
+```
+
+```{r alle-medien-sammeln}
+```
+
+```{r uebersicht}
+```
+
+### Starting the Run
+
+Depending on the data available, the run takes several hours. The simplest way is in the
+terminal from the project folder: `Rscript skripte/b2_alle_scrapen.R` (or with `nur-urls`
+(URLs only) for step 1 alone). First a **dry run** only counts the URLs per outlet
+(`data/processed/uebersicht_urls.csv`), then the main run fetches the full texts
+(`data/processed/uebersicht_scraping.csv`). The overview has one row per outlet: URLs found and
+relevant, articles, articles with usable text, paywall notes, errors and articles per period.
+The CSVs in `data/raw/scraper/` have the common format and enter the database via the
+“scraper-import” chunk.
+
+```{r scrapen-start, eval = FALSE}
+```
+
+```{r scrapen-trockenlauf, eval = FALSE}
+```
+
+```{r scrapen-volltexte, eval = FALSE}
+```
+
+---
+
+# Preprocessing
+
+## Cleaning Text, Cutting Lead and Half Page
+
+`kuerzen_auf_satz()` (trim to sentence) cuts a text to at most `n` characters **but always ends
+on a complete sentence**. From 10,000 texts upwards, this runs in parallel (see “Parallel Computing”). A truncated half-sentence would degrade the translation.
+If there is no sentence end within the range (e.g. an extremely long sentence), the text is
+cut at the last space.
+
+```{r funktion-vorverarbeitung}
+```
+
+## Coarse Filter in the Original Language
+
+The coarse filter is **deliberately generous**: it only removes obviously irrelevant material
+before computing time goes into translation. The actual relevance check happens later in
+English (Section 8). The word stems cover all 20 languages; have native speakers review them
+when possible.
+
+```{r grobfilter}
+```
+
+## Duplicates: Republished Wire Stories
+
+Many outlets run the same AFP, Reuters or dpa story almost verbatim. We need to translate it
+only **once**. We flag an article as a duplicate if its lead (normalised: lower case, no
+punctuation, first 300 characters) already occurs in the same language. The duplicate points
+to the oldest article via `dublette_von` (duplicate of) and later inherits its translation.
+
+For the **analysis**, duplicates stay in the corpus: an outlet's decision to run a wire story
+is part of its coverage. This simple matching finds only near-identical stories; lightly
+rewritten wire copy slips through. This is uncritical for costs.
+
+```{r funktion-dubletten}
+```
+
+```{r dubletten-ausfuehren, eval = FALSE}
+```
+
+---
+
+# Local Translation with NLLB
+
+## What Is NLLB, and Why Run It Locally?
+
+**NLLB-200** (“No Language Left Behind”) is a freely available translation model from Meta
+that covers all our languages. It runs on your own PC, **so it costs nothing** but electricity
+and time. On the GPU it is many times faster than on the CPU. Its licence (CC-BY-NC) permits
+non-commercial research, which covers a master's thesis.
+
+R talks to the model through **`reticulate`**, the bridge to Python.
+
+**AMD graphics card (RX 9070 XT) on Windows:** PyTorch runs here via **ROCm**, AMD's counterpart
+to CUDA. AMD provides dedicated Python packages for this (ROCm 7.2.1 for Windows). Requirements
+according to AMD's guide: **Python 3.12** and **AMD Adrenalin driver 26.2.2 or newer**. If
+PyTorch still does not detect the card, everything continues on the CPU, just more slowly.
+
+One-time setup (downloads about 2 GB in total, plus 2.5 GB for the model on first load).
+We use **`uv`**, a fast Python package manager that reticulate uses anyway. It ships its own
+Python 3.12 (no admin rights, nothing system-wide) and creates the environment where
+reticulate finds it under the name `masterarbeit`.
+
+```{r nllb-einrichten, eval = FALSE}
+```
+
+## Translating Sentence by Sentence
+
+NLLB is trained on **single sentences**. Given several sentences at once, it drops or merges
+sentences and even invents content. In an early three-country test run, translations of ~600-character
+chunks were on average 30% shorter than the original. One translation turned “Aktuaalne
+kaamera” (the ERR news programme) into the “New York Times”. We therefore translate **sentence
+by sentence** (paragraphs and subheadings count as sentence boundaries) and reassemble the
+sentences afterwards. With `num_beams = 4`, the model considers several candidate translations
+instead of only the first.
+
+## Protecting Names and Sources
+
+For the source analysis, it is crucial that names and source attributions survive translation.
+In the example, “vahendas Reuters Gaza allikaid” (“Reuters reported, citing sources in Gaza”)
+became just “sources in Gaza said”: Reuters was gone, and the expert “Rainer Saks” became
+“Germany”.
+
+We therefore request the **four best translations** for each sentence and keep the one that
+contains the most **protected terms**. In case of a tie, the variant the model itself scores
+highest wins. Protected terms are:
+
+- **Agencies and outlets** from a fixed list (Reuters, AFP, dpa, BBC, IDF …), even when they are
+  inflected in the original (Estonian “Reutersi” → “Reuters” is required)
+- **Names**: two consecutive capitalised words such as “Rainer Saks” or
+  “Annalena Baerbock”. In German, this also catches word pairs such as “Bundeskanzler Olaf”
+  (“Chancellor Olaf”). This does no harm: a term that no variant contains does not affect the
+  selection.
+
+The selection can only replace a poor translation with another one **generated by the model
+itself**. It therefore adds nothing that the model did not produce.
+
+In addition, the **per-outlet glossary** applies (see the Configuration section): glossary terms
+are replaced before translation by placeholders (`ZZ01`, `ZZ02` …), which NLLB passes through
+unchanged, and are then replaced by the fixed English form. The **source language** is always
+determined by the outlet, not by the model. Language detection (`cld2`) only checks on import
+whether the text is actually in that language. If it is not, the article is not translated but
+flagged for review via `sprache_pruefen()` (check language).
+
+## Model Choice: 600M or 1.3B?
+
+NLLB comes in several sizes. Tested on 4 October 2026 on 25 relevant articles each from
+tagesschau and ERR (half page, sentence by sentence, RX 9070 XT):
+
+| Variant | Time for 50 texts | Length EN/original (median) | Agencies preserved | Names preserved |
+|---|---|---|---|---|
+| 600M | 15 s | 0.96 | 14/14 | 97.4% |
+| 600M + protection | 14 s | 0.96 | 14/14 | 98.7% |
+| 1.3B | 24 s | 0.96 | 14/14 | 100% |
+| 1.3B + protection | 23 s | 0.96 | 14/14 | 100% |
+
+(“Names preserved”: name pairs such as “Alar Karis” that appear verbatim in at least one
+variant. Measured on 78 names.)
+
+Example: 600M turned “president Alar Karis” into “President Alaris”, with protection into
+“President Al-Alar Karis”, and 1.3B correctly into “President Alar Karis”. **Decision: 1.3B with
+protection.** It is about 60% slower but more reliable on names, which the source analysis
+depends on. Extrapolated to 20,000 half pages, this takes just under 3 hours, i.e. one night.
+
+```{r funktion-nllb}
+```
+
+---
+
+# Staged Nightly Run
+
+## Order of Work
+
+The nightly run works through a **priority list**. Each step specifies which field is
+translated by which engine for which articles. Only when a step is fully completed does the
+run move on to the next.
+
+| # | Field | Engine | Articles | Purpose |
+|---|---|---|---|---|
+| 1 | Title | NLLB | all passing the coarse filter | relevance filter |
+| 2 | Lead | NLLB | all passing the coarse filter | relevance filter, then: compute relevance |
+| 3 | Half page | NLLB | all relevant | **main analysis** |
+
+English-language articles (UK, Ireland) are never translated; the original is used.
+
+```{r schritte}
+```
+
+## Finding Pending Jobs and Processing a Batch
+
+`offene_auftraege()` (pending jobs) queries the database: which articles still need a
+translation for this step? Excluded are duplicates (they inherit the translation),
+English-language articles and anything that failed the coarse filter.
+
+`paket_uebersetzen()` (translate batch) fetches a batch, translates it **per language** and
+saves immediately. The return value tells the nightly run how to proceed: the number of
+translated texts, `0` = step complete.
+
+```{r funktion-paket}
+```
+
+## The Nightly Run
+
+`naechtlicher_lauf()` (nightly run) works through the steps in order until the time is up. It
+deliberately runs **without** CPU parallelisation: the bottleneck is the GPU, and
+multiple workers would only occupy the GPU several times over. Every error
+is written to the log instead of aborting the run. The NLLB model is loaded only
+when a local step actually has work to do.
+
+```{r funktion-nachtlauf}
+```
+
+## Starting Automatically Every Night (Windows)
+
+The file `run_nightly.R` in the repository loads all functions via `source("R/laden.R")` and
+calls `naechtlicher_lauf()`. The
+Windows Task Scheduler starts it every night at 1 a.m. Run once:
+
+```{r aufgabe-anlegen, eval = FALSE}
+```
+
+You can check progress at any time like this:
+
+```{r stand, eval = FALSE}
+```
+
+---
+
+# Fine-Grained Relevance Filter in English
+
+After steps 1 and 2, titles and leads of all articles are available in English. We now check
+more closely whether an article is **actually about the Israel–Palestine conflict** rather than,
+say, the war with Iran or in Lebanon, in which Israel also features.
+
+The rule:
+
+- **Palestine terms** (Gaza, West Bank, Palestin*, Hamas, Rafah, Jenin, settler, UNRWA …)
+  must occur at least once,
+- and at least as often as **regional terms** (Iran, Hezbollah, Lebanon, Houthi …).
+- If no Palestine term occurs but “Israel” does, the article also counts
+  (e.g. Israeli domestic politics relating to the war), provided **no** regional term occurs.
+  (Previously, “Israel” had to occur twice. In an early three-country test run, this excluded
+  relevant Guardian articles because titles and leads are short.)
+
+You validate this on a sample (Section 13).
+
+```{r funktion-relevanz}
+```
+
+## Drawing the Sample for the Translation Cross-Check
+
+Once relevance is determined, we draw, once, the articles whose half page is **additionally**
+translated by a second local translation model (planned: HY-MT2). The sample is stratified by language so
+that every language is represented. No text leaves the computer.
+
+```{r validierung-ziehen, eval = FALSE}
+```
+
+---
+
+# Analysis Corpus and DTM
+
+## Building the Corpus from the Database
+
+For each article we need the English text. The rules:
+
+- **English originals** (UK, IE): original.
+- **All others:** NLLB translation.
+- **Duplicates:** translation of the original article.
+
+The analysis uses `titel_en + halbseite_en`. The half page begins with the lead; appending
+the lead again would double its weight.
+
+```{r funktion-korpus}
+```
+
+```{r korpus-bauen, eval = FALSE}
+```
+
+## Tokens and DTM
+
+As in the pilot, now in English:
+
+1. Tokenise, remove punctuation, numbers and URLs, convert to lower case
+2. Merge **multi-word expressions** (`west_bank`, `israeli_army` …), otherwise they fall apart
+3. Remove English stop words and news-language filler words
+4. Build the DTM; for topic models, remove rare words (in < 10 articles)
+
+We keep the **tokens** (before the DTM): the dictionaries work on them because there they can
+also match multi-word expressions such as “ethnic cleansing”.
+
+```{r dtm, eval = FALSE}
+```
+
+---
+
+# Dictionaries and KWIC
+
+## Removing Boilerplate
+
+Some parsers also pick up teasers for other articles, menus, image credits or newsletter
+notices. The Slovak Pravda, for instance, carried the teaser "Abbas: Palestinians have a right
+to defend themselves …" in about 690 articles. Sentences that appear **verbatim in at least 15
+articles of the same outlet** are therefore removed before all dictionary analyses. This also
+covers recurring agency background paragraphs ("In response to the Hamas assault …"): the frames
+should measure what the outlet itself chooses, not stock text (decision of 08.10.2026, see
+`ENTSCHEIDUNGEN.md`).
+
+```{r textbausteine, eval = FALSE}
+```
+
+## English Discourse Dictionary
+
+The categories follow the research questions. **Important:** a match only means that a term
+**appears in the article**, not that the outlet endorses it. KWIC and the source analysis
+clarify what lies behind it.
+
+```{r woerterbuch, eval = FALSE}
+```
+
+## Self-defence: Four Sub-frames
+
+A match for "self-defence" says nothing about stance: it matches "Israel has the right to
+defend itself" just as well as "This is not self-defence". Each sentence containing the term
+is therefore assigned to one of four classes (first matching rule wins): **Palestinian** (the
+Palestinians' right to defend themselves), **contesting** ("is not self-defence", "goes beyond
+self-defence", "under the pretext of self-defence"), **conditional** ("in accordance with
+international law", "proportionate") and otherwise **affirming**. The patterns were checked on
+samples and are validated in section 13.3.
+
+```{r sv-unterframes, eval = FALSE}
+```
+
+
+## KWIC: Who Says “Genocide”?
+
+```{r kwic, eval = FALSE}
+```
+
+---
+
+# Structural Topic Model
+
+## Idea
+
+A topic model identifies themes that co-occur in articles without our specifying them in
+advance. The **structural** topic model (Roberts et al., *American Journal of Political
+Science* 2014; page still to be verified) additionally allows the **prevalence of a topic** to
+depend on covariates, in our case country and period. This is exactly what the comparison
+requires: which country writes more about the “humanitarian situation” in which period, and
+which more about “security and terrorism”?
+
+## Choosing the Number of Topics
+
+There is no “correct” K. `searchK()` compares metrics (semantic coherence, exclusivity,
+held-out likelihood) across several values of K. In the end, you decide based on
+**interpretability** and document the choice.
+
+**Parallel:** each K is a separate model, so we fit each K in its own worker. The built-in
+`cores` argument of `searchK()` does not work on Windows, hence `furrr`. **Watch the memory:**
+each worker holds a copy of the DTM. With 32 GB RAM, 5 workers (one per K) is a good value. If
+memory gets tight, reduce `workers`.
+
+```{r stm-k, eval = FALSE}
+```
+
+```{r stm-modell, eval = FALSE}
+```
+
+---
+
+# Source Attribution
+
+As in the pilot, now in English and for all countries. For each sentence we check:
+
+1. Does it contain an **attribution pattern** (“according to”, “said”, “claimed” …)?
+2. Which **actor** is named?
+3. Is there a **verification caveat** (“could not be independently verified”)?
+
+Two limitations belong in the thesis: translation can smooth over attributions
+(e.g. “behauptete” (“claimed”) → “said”), which is why we validate against original sentences
+(Section 13); and the sentence level does not capture attributions that span several sentences.
+
+```{r quellen-muster}
+```
+
+```{r quellen-analyse, eval = FALSE}
+```
+
+## German Patterns for the Original (Validation)
+
+For German-language outlets, the patterns developed in the pilot are also available in German.
+They serve to **validate** the English patterns against the original sentence. They also
+contain the context rule for the **Ministry of Health**, which exists both in Israel and in
+Gaza. The assignment is based on the sentence itself, the last unambiguous mention in the
+article, and otherwise the three preceding sentences. In the pilot, this assigned all 23
+mentions correctly.
+
+```{r quellen-muster-de}
+```
+
+```{r funktion-saetze-markieren-de}
+```
+
+---
+
+# Validation
+
+Without validation, automated measurements cannot be used in the thesis. Three checks:
+
+## 13.1 Relevance Filter
+
+Draw 200 articles (half classified as relevant, half as not relevant), code them by hand and
+compute precision and recall.
+
+```{r val-relevanz-export, eval = FALSE}
+```
+
+```{r funktion-guete}
+```
+
+```{r val-relevanz-auswerten, eval = FALSE}
+```
+
+## 13.2 Source Attribution, with a Second Coder
+
+Draw 300 sentences and output them **in the original and in English**. You and a second person
+code them independently. Krippendorff's alpha shows whether you agree (≥ 0.8 is considered
+good); precision/recall then measures how well the patterns perform.
+
+```{r val-quellen, eval = FALSE}
+```
+
+## 13.3 Frames and Sub-frames on Original Sentences
+
+For each dictionary category, 40 matching sentences, and for each self-defence sub-frame, 40
+sentences, shuffled and without the machine category. Coders decide whether the frame applies
+or which class the sentence belongs to. The result is precision per frame; below about 0.8 the
+dictionary is refined.
+
+```{r val-frames, eval = FALSE}
+```
+
+## 13.4 Translation Quality: NLLB vs. a Second Local Model
+
+For the sample (`validierung = 1`), the half page is available in **both** translations (`nllb` and
+`hymt2`; the second model is not installed yet). We test whether the dictionary measurement yields the same
+results with both engines. If it does, the translation is sufficient for our purposes, which is the argument
+for basing the main analysis on NLLB. There is no judge model and nothing is written back.
+
+```{r val-uebersetzung, eval = FALSE}
+```
+
+---
+
+# Reproducibility
+
+- **Back up** the database `data/korpus.sqlite` regularly (external drive or
+  university cloud, not GitHub).
+- Track code versions with Git. Commit before every major analysis step.
+- `sessionInfo()` and the Python package versions belong in the appendix.
+
+```{r session}
+sessionInfo()
+```

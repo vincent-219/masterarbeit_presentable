@@ -1,0 +1,8 @@
+[Unit]
+Description=Masterarbeit: Scraper-Worker an die Rechnerlast anpassen
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Projekte/Masterarbeit_Nahost_Presentable
+ExecStart=%h/Projekte/Masterarbeit_Nahost_Presentable/skripte/scraper_regler.sh
+Nice=10

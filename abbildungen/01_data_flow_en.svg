@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1190" width="1500" height="1190" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <title>Data flow of the pipeline: from configuration to analysis</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b4a5a"/>
+    </marker>
+    <style>
+      .box   { fill:#f4f6f8; stroke:#3b4a5a; stroke-width:1.3; rx:8; }
+      .data  { fill:#e6f0fb; stroke:#2f6aa3; stroke-width:1.3; rx:14; }
+      .dec   { fill:#fff6dd; stroke:#a67c00; stroke-width:1.3; }
+      .stop  { fill:#fbe9e7; stroke:#b3402a; stroke-width:1.3; rx:8; }
+      .note  { fill:#ffffff; stroke:#7a8794; stroke-width:1.1; stroke-dasharray:5 4; rx:8; }
+      .panel { fill:#fbfcfd; stroke:#c9d1d9; stroke-width:1; rx:10; }
+      .pt    { font-size:15px; font-weight:bold; fill:#1f2d3a; }
+      .b     { font-weight:bold; fill:#1f2d3a; }
+      .t     { fill:#2b3945; }
+      .l     { font-size:12px; fill:#5a6773; }
+      .pf    { fill:none; stroke:#3b4a5a; stroke-width:1.4; marker-end:url(#arrow); }
+      .pfs   { fill:none; stroke:#7a8794; stroke-width:1.2; stroke-dasharray:6 4; marker-end:url(#arrow); }
+    </style>
+  </defs>
+
+  <text x="40" y="30" font-size="20" font-weight="bold" fill="#1f2d3a">Israel–Palestine in European and further media: data flow of the pipeline</text>
+  <text x="40" y="50" class="l">Rectangle = processing step (code in R/ and skripte/) · diamond = decision · blue = stored data · red = stop / suspend</text>
+
+  <!-- Panel 1 -->
+  <rect class="panel" x="25" y="62" width="1450" height="115"/>
+  <text class="pt" x="40" y="84">1 Planning and URLs</text>
+  <rect class="box" x="40" y="98" width="330" height="62"/>
+  <text class="b" x="55" y="120">Configuration (R/01)</text>
+  <text class="t" x="55" y="140">54 countries · 377 outlets · periods F1–F6 + K</text>
+  <rect class="box" x="430" y="98" width="330" height="62"/>
+  <text class="b" x="445" y="120">Collect URLs (R/14)</text>
+  <text class="t" x="445" y="140">robots.txt · sitemaps · Media Cloud · archive scrapers</text>
+  <rect class="box" x="820" y="98" width="300" height="62"/>
+  <text class="b" x="835" y="120">Coarse filter on URL and title</text>
+  <text class="t" x="835" y="140">keywords in many languages and scripts</text>
+  <rect class="data" x="1180" y="98" width="270" height="62"/>
+  <text class="b" x="1198" y="120">URL lists per outlet</text>
+  <text class="t" x="1198" y="140">data/raw/urls/*.csv</text>
+  <path class="pf" d="M370,129 L430,129"/>
+  <path class="pf" d="M760,129 L820,129"/>
+  <path class="pf" d="M1120,129 L1180,129"/>
+
+  <!-- Panel 2 -->
+  <rect class="panel" x="25" y="190" width="1450" height="440"/>
+  <text class="pt" x="40" y="212">2 Retrieve full texts (scraper, one worker per outlet)</text>
+  <path class="pf" d="M1315,160 L1315,190 L1315,200 L205,200 L205,232" />
+  <rect class="box" x="40" y="232" width="330" height="72"/>
+  <text class="b" x="55" y="254">Retrieval per outlet (R/15, R/16)</text>
+  <text class="t" x="55" y="273">pause 0.5 s ± 20 %, at least robots.txt crawl delay</text>
+  <text class="t" x="55" y="291">packages of 200 URLs, state saved per outlet</text>
+
+  <path class="pf" d="M205,304 L205,358"/>
+  <polygon class="dec" points="205,358 300,408 205,458 110,408"/>
+  <text class="b" x="205" y="412" text-anchor="middle">HTTP response?</text>
+
+  <rect class="box" x="430" y="330" width="260" height="44"/>
+  <text class="t" x="442" y="357">200: shrink HTML, store as gzip</text>
+  <rect class="box" x="430" y="385" width="260" height="44"/>
+  <text class="t" x="442" y="412">404 / 410: remember as dead, skip</text>
+  <rect class="box" x="430" y="440" width="260" height="44"/>
+  <text class="t" x="442" y="467">429: wait 45–75 s, second attempt</text>
+  <rect class="box" x="430" y="495" width="260" height="44"/>
+  <text class="t" x="442" y="522">403 etc.: error counter + 1</text>
+  <path class="pf" d="M300,408 L340,408 L340,352 L430,352"/>
+  <path class="pf" d="M300,408 L430,407"/>
+  <path class="pf" d="M300,408 L340,408 L340,462 L430,462"/>
+  <path class="pf" d="M300,408 L340,408 L340,517 L430,517"/>
+
+  <rect class="box" x="740" y="330" width="320" height="44"/>
+  <text class="b" x="752" y="350">Extract</text>
+  <text class="t" x="752" y="366">paperboy parser → JSON-LD → general rules</text>
+  <path class="pf" d="M690,352 L740,352"/>
+  <rect class="data" x="1110" y="330" width="340" height="44"/>
+  <text class="b" x="1125" y="350">Scraper CSV per outlet</text>
+  <text class="t" x="1125" y="366">written in packages, atomically (data/raw/scraper)</text>
+  <path class="pf" d="M1060,352 L1110,352"/>
+
+  <polygon class="dec" points="880,517 980,557 880,597 780,557"/>
+  <text class="b" x="880" y="553" text-anchor="middle">≥ 10 errors</text>
+  <text class="b" x="880" y="569" text-anchor="middle">in a row?</text>
+  <path class="pf" d="M690,517 L736,517 L736,557 L780,557"/>
+  <rect class="stop" x="1040" y="535" width="330" height="44"/>
+  <text class="b" x="1055" y="555">Suspend outlet for 24 hours</text>
+  <text class="t" x="1055" y="571">status “Sperre?”, then try again</text>
+  <path class="pf" d="M980,557 L1040,557"/>
+  <text class="l" x="995" y="549">yes</text>
+  <path class="pfs" d="M880,597 L880,614 L18,614 L18,268 L40,268"/>
+  <text class="l" x="890" y="609">no: next URL (loop until all URLs of an outlet are retrieved)</text>
+
+  <rect class="note" x="40" y="500" width="280" height="62"/>
+  <text class="b" x="55" y="520">Disk guard (before every package)</text>
+  <text class="t" x="55" y="538">check both disks; below 2.5 GB free</text>
+  <text class="t" x="55" y="554">retrieval stops, nothing is damaged</text>
+
+  <!-- Panel 3 -->
+  <rect class="panel" x="25" y="642" width="1450" height="132"/>
+  <text class="pt" x="40" y="664">3 Outlets without automatic retrieval: export from Nexis Uni (use cleared with the university library)</text>
+  <rect class="box" x="40" y="680" width="320" height="76"/>
+  <text class="b" x="55" y="702">Check sources and hits</text>
+  <text class="t" x="55" y="721">source name per outlet, search plan</text>
+  <text class="t" x="55" y="739">hit count per window F1–F6</text>
+  <rect class="box" x="430" y="680" width="320" height="76"/>
+  <text class="b" x="445" y="702">Export as RTF</text>
+  <text class="t" x="445" y="721">per outlet and window, in packages</text>
+  <text class="t" x="445" y="739">data/raw/nexis/&lt;outlet&gt;/</text>
+  <rect class="box" x="820" y="680" width="320" height="76"/>
+  <text class="b" x="835" y="702">RTF → CSV and import</text>
+  <text class="t" x="835" y="721">nexis_parsen.py, b4_nexis_importieren.R</text>
+  <text class="t" x="835" y="739">assignment via nexis_namen</text>
+  <path class="pf" d="M360,718 L430,718"/>
+  <path class="pf" d="M750,718 L820,718"/>
+
+  <!-- Panel 4 -->
+  <rect class="panel" x="25" y="786" width="1450" height="180"/>
+  <text class="pt" x="40" y="808">4 Import, translation, relevance</text>
+  <path class="pf" d="M1280,374 L1280,780"/>
+  <path class="pf" d="M1140,718 L1160,718 L1160,780"/>
+  <path class="pf" d="M1280,780 L1280,794 L282,794 L282,846"/>
+  <rect class="box" x="40" y="846" width="250" height="76"/>
+  <text class="b" x="55" y="868">Import into SQLite (R/02)</text>
+  <text class="t" x="55" y="887">only new rows per file</text>
+  <text class="t" x="55" y="905">mark duplicates</text>
+  <rect class="box" x="340" y="846" width="270" height="76"/>
+  <text class="b" x="355" y="868">Translation to English (R/30)</text>
+  <text class="t" x="355" y="887">NLLB-200 local, sentence by sentence,</text>
+  <text class="t" x="355" y="905">name protection, glossary per outlet</text>
+  <rect class="box" x="660" y="846" width="270" height="76"/>
+  <text class="b" x="675" y="868">Quality check</text>
+  <text class="t" x="675" y="887">cross-check with a second model,</text>
+  <text class="t" x="675" y="905">classifier flags suspicious output</text>
+  <rect class="box" x="980" y="846" width="230" height="76"/>
+  <text class="b" x="995" y="868">Relevance filter (R/40)</text>
+  <text class="t" x="995" y="887">coarse filter, then fine</text>
+  <text class="t" x="995" y="905">on the English version</text>
+  <rect class="data" x="1260" y="846" width="200" height="76"/>
+  <text class="b" x="1275" y="868">Analysis corpus (R/50)</text>
+  <text class="t" x="1275" y="887">relevant and available</text>
+  <text class="t" x="1275" y="905">in English</text>
+  <path class="pf" d="M290,884 L340,884"/>
+  <path class="pf" d="M610,884 L660,884"/>
+  <path class="pf" d="M930,884 L980,884"/>
+  <path class="pf" d="M1210,884 L1260,884"/>
+
+  <!-- Panel 5 -->
+  <rect class="panel" x="25" y="978" width="1450" height="140"/>
+  <text class="pt" x="40" y="1000">5 Analysis and validation</text>
+  <path class="pf" d="M1360,922 L1360,970 L300,970 L300,1022"/>
+  <rect class="box" x="40" y="1022" width="300" height="76"/>
+  <text class="b" x="55" y="1044">Frames (R/55)</text>
+  <text class="t" x="55" y="1063">dictionaries, boilerplate removed,</text>
+  <text class="t" x="55" y="1081">self-defence sentence by sentence</text>
+  <rect class="box" x="390" y="1022" width="300" height="76"/>
+  <text class="b" x="405" y="1044">Source attribution (R/60)</text>
+  <text class="t" x="405" y="1063">English/German patterns,</text>
+  <text class="t" x="405" y="1081">health-ministry rule</text>
+  <rect class="box" x="740" y="1022" width="330" height="76"/>
+  <text class="b" x="755" y="1044">Statistics (only at the end)</text>
+  <text class="t" x="755" y="1063">STM, multilevel logit, model comparisons</text>
+  <text class="t" x="755" y="1081">skripte/live_methoden.R, a4_analyse.R</text>
+  <rect class="box" x="1120" y="1022" width="330" height="76"/>
+  <text class="b" x="1135" y="1044">Validation (R/70)</text>
+  <text class="t" x="1135" y="1063">samples, hand coding,</text>
+  <text class="t" x="1135" y="1081">measures (relevance, sources, translation)</text>
+  <path class="pf" d="M340,1060 L390,1060"/>
+  <path class="pf" d="M690,1060 L740,1060"/>
+  <path class="pf" d="M1070,1060 L1120,1060"/>
+
+  <text x="40" y="1150" class="l">Main document with explanations: 02_pipeline_en.Rmd · decisions with date and rationale: DECISIONS_en.md · loops during operation: abbildungen/02_operation_and_decisions_en.svg</text>
+</svg>

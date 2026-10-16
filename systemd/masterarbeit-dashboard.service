@@ -1,0 +1,11 @@
+[Unit]
+Description=Masterarbeit: Live-Dashboard neu berechnen (data/live/dashboard.html)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Projekte/Masterarbeit_Nahost_Presentable
+ExecStart=/usr/bin/python3 skripte/live_dashboard.py
+# so wenig wie möglich stören: niedrigste CPU- und Platten-Priorität
+Nice=19
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle

@@ -1,0 +1,9 @@
+prioritaet,land,medium,sprache,grund,suchstring
+1,Luxemburg,Luxemburger Wort,DE,"Scraper: HTTP-Sperre, 0 % abgerufen; in Nexis ggf. nicht enthalten",(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*) AND Israel
+1,Luxemburg,Tageblatt,DE,Zugang laut Konfiguration: WISO; 63 % abgerufen,(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*) AND Israel
+2,Deutschland,FAZ,DE,"Paywall teilweise, 65 % abgerufen",(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*) AND Israel
+2,Deutschland,Die Welt,DE,"Paywall teilweise, 72 % abgerufen (Nexis möglich)",(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*) AND Israel
+2,Schweiz,Neue Zürcher Zeitung,DE,Paywall; Scraper zieht gerade erst Volltexte; in WISO prüfen,(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*) AND Israel
+2,Schweiz,Tages-Anzeiger,DE,Paywall teilweise; in WISO prüfen,(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*) AND Israel
+3,Österreich,Die Presse,DE,"Paywall teilweise, 65 % abgerufen",(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*) AND Israel
+3,Österreich,Der Standard,DE,"Paywall teilweise, 100 % abgerufen (nur bei Lücken nötig)",(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*) AND Israel

@@ -1,0 +1,24 @@
+#!/bin/bash
+# Stromlimit der AMD-Grafikkarte für den Nachtlauf setzen bzw. zurücksetzen (läuft als root).
+#   nachtlauf-gpu senken 221      -> Limit auf 221 W (wird auf power1_cap_min..max begrenzt)
+#   nachtlauf-gpu zuruecksetzen   -> Limit auf power1_cap_default
+set -euo pipefail
+
+hw=""
+for d in /sys/class/drm/card*/device/hwmon/hwmon*; do
+  [[ -f $d/power1_cap && $(cat "$d/name") == amdgpu ]] && { hw=$d; break; }
+done
+[[ -n $hw ]] || { echo "keine amdgpu-hwmon mit power1_cap gefunden" >&2; exit 1; }
+
+case "${1:-}" in
+  senken)
+    ziel=$(( ${2:?Watt fehlt} * 1000000 ))
+    min=$(cat "$hw/power1_cap_min"); max=$(cat "$hw/power1_cap_max")
+    (( ziel < min )) && ziel=$min
+    (( ziel > max )) && ziel=$max
+    echo "$ziel" > "$hw/power1_cap" ;;
+  zuruecksetzen)
+    cat "$hw/power1_cap_default" > "$hw/power1_cap" ;;
+  *) echo "Aufruf: $0 senken <Watt> | zuruecksetzen" >&2; exit 2 ;;
+esac
+echo "GPU-Limit jetzt: $(( $(cat "$hw/power1_cap") / 1000000 )) W ($hw)"

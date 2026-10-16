@@ -1,0 +1,15 @@
+[Unit]
+Description=Masterarbeit: Dauerbetrieb Import + Übersetzung (neue Artikel werden laufend übersetzt)
+
+[Service]
+WorkingDirectory=%h/Projekte/Masterarbeit_Nahost_Presentable
+Environment=NACHTLAUF_MINUTEN=1440
+ExecStart=/usr/bin/nice -n 10 /usr/bin/Rscript run_nightly.R
+Restart=always
+RestartSec=120
+RuntimeMaxSec=88200
+MemoryHigh=8G
+MemoryMax=10G
+
+[Install]
+WantedBy=default.target

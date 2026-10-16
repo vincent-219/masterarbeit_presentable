@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1030" width="1500" height="1030" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <title>Betrieb: Regelkreise, Schleifen und Entscheidungen</title>
+  <defs>
+    <marker id="pfeil" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b4a5a"/>
+    </marker>
+    <style>
+      .box   { fill:#f4f6f8; stroke:#3b4a5a; stroke-width:1.3; rx:8; }
+      .data  { fill:#e6f0fb; stroke:#2f6aa3; stroke-width:1.3; rx:14; }
+      .ent   { fill:#fff6dd; stroke:#a67c00; stroke-width:1.3; }
+      .stop  { fill:#fbe9e7; stroke:#b3402a; stroke-width:1.3; rx:8; }
+      .ok    { fill:#e8f5e9; stroke:#3b7d3f; stroke-width:1.3; rx:8; }
+      .panel { fill:#fbfcfd; stroke:#c9d1d9; stroke-width:1; rx:10; }
+      .pt    { font-size:15px; font-weight:bold; fill:#1f2d3a; }
+      .b     { font-weight:bold; fill:#1f2d3a; }
+      .t     { fill:#2b3945; }
+      .l     { font-size:12px; fill:#5a6773; }
+      .pf    { fill:none; stroke:#3b4a5a; stroke-width:1.4; marker-end:url(#pfeil); }
+      .pfs   { fill:none; stroke:#7a8794; stroke-width:1.2; stroke-dasharray:6 4; marker-end:url(#pfeil); }
+    </style>
+  </defs>
+
+  <text x="40" y="30" font-size="20" font-weight="bold" fill="#1f2d3a">Betrieb: Schleifen, Regelkreise und Entscheidungen</text>
+  <text x="40" y="50" class="l">Alle Dienste laufen als systemd-Dienste und -Timer (Dateien in systemd/). Rechteck = Schritt · Raute = Entscheidung · gestrichelt = Schleife</text>
+
+  <!-- A: Scraper-Dienst und Regler -->
+  <rect class="panel" x="25" y="62" width="1450" height="270"/>
+  <text class="pt" x="40" y="84">A Scraper-Dienst und Regler (masterarbeit-scraper, masterarbeit-scraper-regler)</text>
+  <rect class="box" x="40" y="104" width="290" height="70"/>
+  <text class="b" x="55" y="126">Start (scraper_start.sh)</text>
+  <text class="t" x="55" y="145">Workerzahl berechnen (siehe B),</text>
+  <text class="t" x="55" y="162">Rscript b2_alle_scrapen.R nur-volltexte N</text>
+  <rect class="box" x="380" y="104" width="290" height="70"/>
+  <text class="b" x="395" y="126">Lauf</text>
+  <text class="t" x="395" y="145">alle Medien mit URL-Liste, ein Worker</text>
+  <text class="t" x="395" y="162">je Medium, größte Medien zuerst</text>
+  <polygon class="ent" points="820,104 920,139 820,174 720,139"/>
+  <text class="b" x="820" y="143" text-anchor="middle">Lauf zu Ende?</text>
+  <rect class="box" x="970" y="104" width="300" height="70"/>
+  <text class="b" x="985" y="126">10 Minuten warten, neu starten</text>
+  <text class="t" x="985" y="145">neue URLs und ausgesetzte Medien</text>
+  <text class="t" x="985" y="162">kommen im nächsten Lauf dran</text>
+  <path class="pf" d="M330,139 L380,139"/>
+  <path class="pf" d="M670,139 L720,139"/>
+  <path class="pf" d="M920,139 L970,139"/>
+  <text class="l" x="930" y="131">ja</text>
+  <path class="pfs" d="M1120,104 L1120,96 L185,96 L185,104"/>
+  <text class="l" x="800" y="90">Schleife: Dauerbetrieb (Restart=always)</text>
+
+  <rect class="box" x="40" y="214" width="330" height="70"/>
+  <text class="b" x="55" y="236">Regler, alle 3 Minuten (Timer)</text>
+  <text class="t" x="55" y="255">Zielzahl berechnen (B) und mit der</text>
+  <text class="t" x="55" y="272">laufenden Workerzahl vergleichen</text>
+  <polygon class="ent" points="540,214 680,249 540,284 400,249"/>
+  <text class="b" x="540" y="245" text-anchor="middle">Abweichung ≥ 2</text>
+  <text class="b" x="540" y="261" text-anchor="middle">und Lauf ≥ 15 min?</text>
+  <polygon class="ent" points="870,214 990,249 870,284 750,249"/>
+  <text class="b" x="870" y="245" text-anchor="middle">oder Notlage</text>
+  <text class="b" x="870" y="261" text-anchor="middle">(Ziel = 2)?</text>
+  <rect class="box" x="1060" y="214" width="300" height="70"/>
+  <text class="b" x="1075" y="236">Scraper neu starten</text>
+  <text class="t" x="1075" y="255">mit der neuen Workerzahl;</text>
+  <text class="t" x="1075" y="272">geholte Seiten werden übersprungen</text>
+  <path class="pf" d="M370,249 L400,249"/>
+  <path class="pf" d="M680,249 L750,249"/>
+  <path class="pf" d="M990,249 L1060,249"/>
+  <text class="l" x="700" y="241">nein</text>
+  <text class="l" x="1005" y="241">ja</text>
+  <path class="pf" d="M540,214 L540,196 L1210,196 L1210,214" />
+  <text class="l" x="560" y="192">ja: sofort neu starten</text>
+
+  <!-- B: Workerzahl -->
+  <rect class="panel" x="25" y="344" width="1450" height="215"/>
+  <text class="pt" x="40" y="366">B Wie viele Worker? (scraper_workers.sh, Grenzen 2 bis 8)</text>
+  <rect class="box" x="40" y="384" width="300" height="80"/>
+  <text class="b" x="55" y="406">Grundwert aus dem Speicher</text>
+  <text class="t" x="55" y="425">(freier RAM + Speicher des Scrapers</text>
+  <text class="t" x="55" y="442">− 5 GB Reserve) / 1,5 GB je Worker</text>
+  <polygon class="ent" points="470,384 580,424 470,464 360,424"/>
+  <text class="b" x="470" y="421" text-anchor="middle">Swap</text>
+  <text class="b" x="470" y="437" text-anchor="middle">≥ 90 %?</text>
+  <polygon class="ent" points="710,384 820,424 710,464 600,424"/>
+  <text class="b" x="710" y="421" text-anchor="middle">Speicherdruck</text>
+  <text class="b" x="710" y="437" text-anchor="middle">(PSI) ≥ 10 %?</text>
+  <polygon class="ent" points="950,384 1060,424 950,464 840,424"/>
+  <text class="b" x="950" y="421" text-anchor="middle">Übersetzung</text>
+  <text class="b" x="950" y="437" text-anchor="middle">läuft?</text>
+  <rect class="ok" x="1110" y="384" width="340" height="80"/>
+  <text class="b" x="1125" y="406">Ergebnis: 2 bis 8 Worker</text>
+  <text class="t" x="1125" y="425">gespeichert in $XDG_RUNTIME_DIR, damit der</text>
+  <text class="t" x="1125" y="442">Regler die laufende Zahl kennt</text>
+  <path class="pf" d="M340,424 L360,424"/>
+  <path class="pf" d="M580,424 L600,424"/>
+  <path class="pf" d="M820,424 L840,424"/>
+  <path class="pf" d="M1060,424 L1110,424"/>
+  <text class="l" x="470" y="486" text-anchor="middle">ja: höchstens 3 Worker (ab 97 %: 2)</text>
+  <text class="l" x="710" y="486" text-anchor="middle">ja: höchstens 4 Worker (ab 25 %: 2)</text>
+  <text class="l" x="950" y="486" text-anchor="middle">ja: höchstens 6 Worker</text>
+  <text class="l" x="40" y="520">Ziel: möglichst hoher Durchsatz, solange der Rechner stabil bleibt. Anlass: Ein Lauf mit 8 Workern neben der Übersetzung wurde wegen Speichermangels vom System beendet.</text>
+  <text class="l" x="40" y="540">Pro Medium bleibt es bei einer Anfrage zur Zeit; mehr Worker bedeuten mehr Medien gleichzeitig, nicht mehr Anfragen an dasselbe Medium.</text>
+
+  <!-- C: Import und Übersetzung -->
+  <rect class="panel" x="25" y="571" width="1450" height="215"/>
+  <text class="pt" x="40" y="593">C Import und Übersetzung (masterarbeit-uebersetzer; nachts masterarbeit-nachtlauf)</text>
+  <rect class="box" x="40" y="613" width="310" height="76"/>
+  <text class="b" x="55" y="635">Import (bei jedem Durchgang)</text>
+  <text class="t" x="55" y="654">neue Artikel aus den Scraper-CSVs,</text>
+  <text class="t" x="55" y="671">nur Zeilen, die noch nicht importiert sind</text>
+  <polygon class="ent" points="500,613 610,651 500,689 390,651"/>
+  <text class="b" x="500" y="648" text-anchor="middle">Offene</text>
+  <text class="b" x="500" y="664" text-anchor="middle">Übersetzungen?</text>
+  <rect class="box" x="670" y="613" width="330" height="76"/>
+  <text class="b" x="685" y="635">Übersetzen (GPU), Titel und Lead zuerst</text>
+  <text class="t" x="685" y="654">Paket von höchstens 8 Minuten, danach</text>
+  <text class="t" x="685" y="671">Relevanz neu prüfen, zurück zum Import</text>
+  <rect class="box" x="1050" y="613" width="400" height="76"/>
+  <text class="b" x="1065" y="635">Nichts offen</text>
+  <text class="t" x="1065" y="654">Grafikspeicher freigeben, 2 Minuten warten,</text>
+  <text class="t" x="1065" y="671">dann wieder importieren (Schleife bis Zeitende)</text>
+  <path class="pf" d="M350,651 L390,651"/>
+  <path class="pf" d="M610,651 L670,651"/>
+  <text class="l" x="625" y="643">ja</text>
+  <path class="pf" d="M500,689 L500,712 L1250,712 L1250,689"/>
+  <text class="l" x="520" y="708">nein</text>
+  <path class="pfs" d="M1450,651 L1462,651 L1462,600 L195,600 L195,613"/>
+  <text class="l" x="40" y="732">Nur eine Übersetzungs-Instanz gleichzeitig (Sperrdatei): Läuft der Dauerdienst, beendet sich der Nachtlauf-Start um 01:00 sofort.</text>
+  <text class="l" x="40" y="752">Ohne Dauerdienst läuft der Nachtlauf von 01:00 bis 09:00 mit gedrosselter Grafikkarte; beide arbeiten dieselbe Liste offener Übersetzungen ab.</text>
+  <text class="l" x="40" y="772">Die Qualitätsprüfung (Gegenprobe mit zweitem Modell, Classifier) läuft getrennt und ersetzt keine Übersetzung; Sprachen ohne Vergleichsmodell bleiben unbewertet.</text>
+
+  <!-- D: Dashboard, Endkontrolle -->
+  <rect class="panel" x="25" y="798" width="1450" height="215"/>
+  <text class="pt" x="40" y="820">D Dashboard und Endkontrolle</text>
+  <rect class="box" x="40" y="840" width="330" height="76"/>
+  <text class="b" x="55" y="862">Dashboard (alle 5 Minuten)</text>
+  <text class="t" x="55" y="881">baut data/live/dashboard.html aus der</text>
+  <text class="t" x="55" y="898">Datenbank (niedrigste Priorität)</text>
+  <rect class="box" x="420" y="840" width="330" height="76"/>
+  <text class="b" x="435" y="862">Live-Server (nur lesend, 127.0.0.1)</text>
+  <text class="t" x="435" y="881">liefert die Seite und den Stand</text>
+  <text class="t" x="435" y="898">in Echtzeit (alle 5 Sekunden)</text>
+  <rect class="box" x="800" y="840" width="300" height="76"/>
+  <text class="b" x="815" y="862">Endkontrolle (stündlich)</text>
+  <text class="t" x="815" y="881">prüft, ob Abruf und Übersetzung</text>
+  <text class="t" x="815" y="898">abgeschlossen sind</text>
+  <polygon class="ent" points="1230,840 1340,878 1230,916 1120,878"/>
+  <text class="b" x="1230" y="868" text-anchor="middle">Abgeschlossen,</text>
+  <text class="b" x="1230" y="884" text-anchor="middle">Scraper aus,</text>
+  <text class="b" x="1230" y="900" text-anchor="middle">nichts offen?</text>
+  <rect class="ok" x="1380" y="840" width="85" height="76"/>
+  <text class="b" x="1422" y="870" text-anchor="middle">Statistik</text>
+  <text class="b" x="1422" y="888" text-anchor="middle">einmal</text>
+  <text class="b" x="1422" y="906" text-anchor="middle">rechnen</text>
+  <path class="pf" d="M370,878 L420,878"/>
+  <path class="pf" d="M1100,878 L1120,878"/>
+  <path class="pf" d="M1340,878 L1380,878"/>
+  <text class="l" x="1350" y="870">ja</text>
+  <path class="pfs" d="M1230,916 L1230,940 L950,940 L950,916"/>
+  <text class="l" x="1000" y="956">nein: nach einer Stunde erneut prüfen</text>
+  <text class="l" x="40" y="990">Die statistischen Methoden laufen bewusst erst am Schluss (Marker data/live/sammlung_abgeschlossen); Zwischenstände im Dashboard sind vorläufig.</text>
+</svg>

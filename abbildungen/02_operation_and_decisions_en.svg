@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1030" width="1500" height="1030" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <title>Operation: control loops, loops and decisions</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b4a5a"/>
+    </marker>
+    <style>
+      .box   { fill:#f4f6f8; stroke:#3b4a5a; stroke-width:1.3; rx:8; }
+      .data  { fill:#e6f0fb; stroke:#2f6aa3; stroke-width:1.3; rx:14; }
+      .dec   { fill:#fff6dd; stroke:#a67c00; stroke-width:1.3; }
+      .ok    { fill:#e8f5e9; stroke:#3b7d3f; stroke-width:1.3; rx:8; }
+      .panel { fill:#fbfcfd; stroke:#c9d1d9; stroke-width:1; rx:10; }
+      .pt    { font-size:15px; font-weight:bold; fill:#1f2d3a; }
+      .b     { font-weight:bold; fill:#1f2d3a; }
+      .t     { fill:#2b3945; }
+      .l     { font-size:12px; fill:#5a6773; }
+      .pf    { fill:none; stroke:#3b4a5a; stroke-width:1.4; marker-end:url(#arrow); }
+      .pfs   { fill:none; stroke:#7a8794; stroke-width:1.2; stroke-dasharray:6 4; marker-end:url(#arrow); }
+    </style>
+  </defs>
+
+  <text x="40" y="30" font-size="20" font-weight="bold" fill="#1f2d3a">Operation: loops, control loops and decisions</text>
+  <text x="40" y="50" class="l">All services run as systemd services and timers (files in systemd/). Rectangle = step · diamond = decision · dashed = loop</text>
+
+  <!-- A -->
+  <rect class="panel" x="25" y="62" width="1450" height="270"/>
+  <text class="pt" x="40" y="84">A Scraper service and regulator (masterarbeit-scraper, masterarbeit-scraper-regler)</text>
+  <rect class="box" x="40" y="104" width="290" height="70"/>
+  <text class="b" x="55" y="126">Start (scraper_start.sh)</text>
+  <text class="t" x="55" y="145">compute number of workers (see B),</text>
+  <text class="t" x="55" y="162">Rscript b2_alle_scrapen.R nur-volltexte N</text>
+  <rect class="box" x="380" y="104" width="290" height="70"/>
+  <text class="b" x="395" y="126">Run</text>
+  <text class="t" x="395" y="145">all outlets with a URL list, one worker</text>
+  <text class="t" x="395" y="162">per outlet, largest outlets first</text>
+  <polygon class="dec" points="820,104 920,139 820,174 720,139"/>
+  <text class="b" x="820" y="143" text-anchor="middle">Run finished?</text>
+  <rect class="box" x="970" y="104" width="300" height="70"/>
+  <text class="b" x="985" y="126">Wait 10 minutes, restart</text>
+  <text class="t" x="985" y="145">new URLs and suspended outlets</text>
+  <text class="t" x="985" y="162">are picked up in the next run</text>
+  <path class="pf" d="M330,139 L380,139"/>
+  <path class="pf" d="M670,139 L720,139"/>
+  <path class="pf" d="M920,139 L970,139"/>
+  <text class="l" x="930" y="131">yes</text>
+  <path class="pfs" d="M1120,104 L1120,96 L185,96 L185,104"/>
+  <text class="l" x="800" y="90">loop: continuous operation (Restart=always)</text>
+
+  <rect class="box" x="40" y="214" width="330" height="70"/>
+  <text class="b" x="55" y="236">Regulator, every 3 minutes (timer)</text>
+  <text class="t" x="55" y="255">compute target number (B) and compare</text>
+  <text class="t" x="55" y="272">with the number of running workers</text>
+  <polygon class="dec" points="540,214 680,249 540,284 400,249"/>
+  <text class="b" x="540" y="245" text-anchor="middle">Deviation ≥ 2</text>
+  <text class="b" x="540" y="261" text-anchor="middle">and run ≥ 15 min?</text>
+  <polygon class="dec" points="870,214 990,249 870,284 750,249"/>
+  <text class="b" x="870" y="245" text-anchor="middle">or emergency</text>
+  <text class="b" x="870" y="261" text-anchor="middle">(target = 2)?</text>
+  <rect class="box" x="1060" y="214" width="300" height="70"/>
+  <text class="b" x="1075" y="236">Restart scraper</text>
+  <text class="t" x="1075" y="255">with the new number of workers;</text>
+  <text class="t" x="1075" y="272">retrieved pages are skipped</text>
+  <path class="pf" d="M370,249 L400,249"/>
+  <path class="pf" d="M680,249 L750,249"/>
+  <path class="pf" d="M990,249 L1060,249"/>
+  <text class="l" x="700" y="241">no</text>
+  <text class="l" x="1005" y="241">yes</text>
+  <path class="pf" d="M540,214 L540,196 L1210,196 L1210,214" />
+  <text class="l" x="560" y="192">yes: restart immediately</text>
+
+  <!-- B -->
+  <rect class="panel" x="25" y="344" width="1450" height="215"/>
+  <text class="pt" x="40" y="366">B How many workers? (scraper_workers.sh, limits 2 to 8)</text>
+  <rect class="box" x="40" y="384" width="300" height="80"/>
+  <text class="b" x="55" y="406">Base value from memory</text>
+  <text class="t" x="55" y="425">(free RAM + memory of the scraper</text>
+  <text class="t" x="55" y="442">− 5 GB reserve) / 1.5 GB per worker</text>
+  <polygon class="dec" points="470,384 580,424 470,464 360,424"/>
+  <text class="b" x="470" y="421" text-anchor="middle">Swap</text>
+  <text class="b" x="470" y="437" text-anchor="middle">≥ 90 %?</text>
+  <polygon class="dec" points="710,384 820,424 710,464 600,424"/>
+  <text class="b" x="710" y="421" text-anchor="middle">Memory pressure</text>
+  <text class="b" x="710" y="437" text-anchor="middle">(PSI) ≥ 10 %?</text>
+  <polygon class="dec" points="950,384 1060,424 950,464 840,424"/>
+  <text class="b" x="950" y="421" text-anchor="middle">Translation</text>
+  <text class="b" x="950" y="437" text-anchor="middle">running?</text>
+  <rect class="ok" x="1110" y="384" width="340" height="80"/>
+  <text class="b" x="1125" y="406">Result: 2 to 8 workers</text>
+  <text class="t" x="1125" y="425">stored in $XDG_RUNTIME_DIR so that the</text>
+  <text class="t" x="1125" y="442">regulator knows the current number</text>
+  <path class="pf" d="M340,424 L360,424"/>
+  <path class="pf" d="M580,424 L600,424"/>
+  <path class="pf" d="M820,424 L840,424"/>
+  <path class="pf" d="M1060,424 L1110,424"/>
+  <text class="l" x="470" y="486" text-anchor="middle">yes: at most 3 workers (from 97 %: 2)</text>
+  <text class="l" x="710" y="486" text-anchor="middle">yes: at most 4 workers (from 25 %: 2)</text>
+  <text class="l" x="950" y="486" text-anchor="middle">yes: at most 6 workers</text>
+  <text class="l" x="40" y="520">Aim: highest possible throughput while the machine stays stable. Reason: a run with 8 workers next to the translation was ended by the system because of lack of memory.</text>
+  <text class="l" x="40" y="540">Per outlet there is still one request at a time; more workers mean more outlets in parallel, not more requests to the same outlet.</text>
+
+  <!-- C -->
+  <rect class="panel" x="25" y="571" width="1450" height="215"/>
+  <text class="pt" x="40" y="593">C Import and translation (masterarbeit-uebersetzer; at night masterarbeit-nachtlauf)</text>
+  <rect class="box" x="40" y="613" width="310" height="76"/>
+  <text class="b" x="55" y="635">Import (on every pass)</text>
+  <text class="t" x="55" y="654">new articles from the scraper CSVs,</text>
+  <text class="t" x="55" y="671">only rows not yet imported</text>
+  <polygon class="dec" points="500,613 610,651 500,689 390,651"/>
+  <text class="b" x="500" y="648" text-anchor="middle">Open</text>
+  <text class="b" x="500" y="664" text-anchor="middle">translations?</text>
+  <rect class="box" x="670" y="613" width="330" height="76"/>
+  <text class="b" x="685" y="635">Translate (GPU), titles and lead first</text>
+  <text class="t" x="685" y="654">package of at most 8 minutes, then</text>
+  <text class="t" x="685" y="671">re-check relevance, back to import</text>
+  <rect class="box" x="1050" y="613" width="400" height="76"/>
+  <text class="b" x="1065" y="635">Nothing open</text>
+  <text class="t" x="1065" y="654">free GPU memory, wait 2 minutes,</text>
+  <text class="t" x="1065" y="671">then import again (loop until time is up)</text>
+  <path class="pf" d="M350,651 L390,651"/>
+  <path class="pf" d="M610,651 L670,651"/>
+  <text class="l" x="625" y="643">yes</text>
+  <path class="pf" d="M500,689 L500,712 L1250,712 L1250,689"/>
+  <text class="l" x="520" y="708">no</text>
+  <path class="pfs" d="M1450,651 L1462,651 L1462,600 L195,600 L195,613"/>
+  <text class="l" x="40" y="732">Only one translation instance at a time (lock file): while the continuous service runs, the night-run start at 01:00 ends immediately.</text>
+  <text class="l" x="40" y="752">Without the continuous service the night run works from 01:00 to 09:00 with a throttled GPU; both work through the same list of open translations.</text>
+  <text class="l" x="40" y="772">The quality check (cross-check with a second model, classifier) runs separately and does not replace a translation; languages without a comparison model stay unrated.</text>
+
+  <!-- D -->
+  <rect class="panel" x="25" y="798" width="1450" height="215"/>
+  <text class="pt" x="40" y="820">D Dashboard and final check</text>
+  <rect class="box" x="40" y="840" width="330" height="76"/>
+  <text class="b" x="55" y="862">Dashboard (every 5 minutes)</text>
+  <text class="t" x="55" y="881">builds data/live/dashboard.html from the</text>
+  <text class="t" x="55" y="898">database (lowest priority)</text>
+  <rect class="box" x="420" y="840" width="330" height="76"/>
+  <text class="b" x="435" y="862">Live server (read-only, 127.0.0.1)</text>
+  <text class="t" x="435" y="881">serves the page and the status</text>
+  <text class="t" x="435" y="898">in real time (every 5 seconds)</text>
+  <rect class="box" x="800" y="840" width="300" height="76"/>
+  <text class="b" x="815" y="862">Final check (hourly)</text>
+  <text class="t" x="815" y="881">checks whether retrieval and translation</text>
+  <text class="t" x="815" y="898">are finished</text>
+  <polygon class="dec" points="1230,840 1340,878 1230,916 1120,878"/>
+  <text class="b" x="1230" y="868" text-anchor="middle">Finished,</text>
+  <text class="b" x="1230" y="884" text-anchor="middle">scraper off,</text>
+  <text class="b" x="1230" y="900" text-anchor="middle">nothing open?</text>
+  <rect class="ok" x="1380" y="840" width="85" height="76"/>
+  <text class="b" x="1422" y="870" text-anchor="middle">Compute</text>
+  <text class="b" x="1422" y="888" text-anchor="middle">statistics</text>
+  <text class="b" x="1422" y="906" text-anchor="middle">once</text>
+  <path class="pf" d="M370,878 L420,878"/>
+  <path class="pf" d="M1100,878 L1120,878"/>
+  <path class="pf" d="M1340,878 L1380,878"/>
+  <text class="l" x="1350" y="870">yes</text>
+  <path class="pfs" d="M1230,916 L1230,940 L950,940 L950,916"/>
+  <text class="l" x="1000" y="956">no: check again after one hour</text>
+  <text class="l" x="40" y="990">The statistical methods deliberately run only at the end (marker data/live/sammlung_abgeschlossen); interim results in the dashboard are preliminary.</text>
+</svg>

@@ -1,0 +1,17 @@
+prioritaet,land,medium,sprache,grund,suchstring
+1,Vereinigtes Königreich,The Telegraph,EN,"Scraper: HTTP 403, 0 % abgerufen","ATLEAST2(Gaza OR Hamas OR Palestin* OR ""West Bank"" OR Rafah OR UNRWA OR hostage*)"
+1,Frankreich,Libération,FR,"Scraper: HTTP-Sperre, 0 % abgerufen",ATLEAST2(Gaza OR Hamas OR palestinien* OR Cisjordanie OR Rafah OR UNRWA OR otage*)
+1,Irland,Irish Independent,EN,"Scraper: HTTP-Sperre, 0 % abgerufen","ATLEAST2(Gaza OR Hamas OR Palestin* OR ""West Bank"" OR Rafah OR UNRWA OR hostage*)"
+1,Niederlande,De Telegraaf,NL,"Scraper: HTTP-Sperre, 0 % abgerufen","ATLEAST2(Gaza OR Hamas OR Palestijn* OR ""Westelijke Jordaanoever"" OR Rafah OR UNRWA OR gijzelaar*)"
+1,Belgien,Het Laatste Nieuws,NL,0 % abgerufen,"ATLEAST2(Gaza OR Hamas OR Palestijn* OR ""Westelijke Jordaanoever"" OR Rafah OR UNRWA OR gijzelaar*)"
+1,Luxemburg,Luxemburger Wort,DE,"Scraper: HTTP-Sperre, 0 % abgerufen",ATLEAST2(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*)
+1,Portugal,Correio da Manhã,PT,"Scraper: HTTP-Sperre, 0 % abgerufen",ATLEAST2(Gaza OR Hamas OR palestin* OR Cisjordânia OR Rafah OR UNRWA OR refém OR reféns)
+1,Malta,The Malta Independent,EN,"Scraper: HTTP-Sperre, 0 % abgerufen","ATLEAST2(Gaza OR Hamas OR Palestin* OR ""West Bank"" OR Rafah OR UNRWA OR hostage*)"
+1,Bulgarien,Dnevnik,BG,"Scraper: HTTP-Sperre, 0 % abgerufen","ATLEAST2(Газа OR Хамас OR палестин* OR ""Западния бряг"" OR Рафа OR UNRWA OR заложник*)"
+2,Niederlande,de Volkskrant,NL,0 % abgerufen (Paywall),"ATLEAST2(Gaza OR Hamas OR Palestijn* OR ""Westelijke Jordaanoever"" OR Rafah OR UNRWA OR gijzelaar*)"
+2,Niederlande,Algemeen Dagblad,NL,0 % abgerufen (Paywall),"ATLEAST2(Gaza OR Hamas OR Palestijn* OR ""Westelijke Jordaanoever"" OR Rafah OR UNRWA OR gijzelaar*)"
+3,Norwegen,Aftenposten,NO,Paywall; Scraper zieht gerade erst Volltexte,ATLEAST2(Gaza OR Hamas OR palestin* OR Vestbredden OR Rafah OR UNRWA OR gisler*)
+3,Schweiz,Neue Zürcher Zeitung,DE,Paywall; Scraper zieht gerade erst Volltexte,ATLEAST2(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*)
+3,Schweiz,Tages-Anzeiger,DE,Paywall teilweise; erst nach Scraper-Lauf bewerten,ATLEAST2(Gaza OR Hamas OR Palästin* OR Westjordanland OR Rafah OR UNRWA OR Geisel*)
+3,Schweiz,Le Temps,FR,Paywall teilweise; erst nach Scraper-Lauf bewerten,ATLEAST2(Gaza OR Hamas OR palestinien* OR Cisjordanie OR Rafah OR UNRWA OR otage*)
+3,Norwegen,VG,NO,"13 % abgerufen, Scraper läuft",ATLEAST2(Gaza OR Hamas OR palestin* OR Vestbredden OR Rafah OR UNRWA OR gisler*)

@@ -1,0 +1,41 @@
+land,medium,domain,sprache,traeger,typ,zugelassen,grund
+Portugal,Diário de Notícias,dn.pt,PT,privat,qualitaet,True,ok
+Portugal,Jornal de Notícias,jn.pt,PT,privat,qualitaet,False,Startseite HTTP 403
+Portugal,CNN Portugal,cnnportugal.iol.pt,PT,privat,rundfunk,True,ok
+Portugal,Sapo Notícias,noticias.sapo.pt,PT,privat,online,True,ok
+Schweden,Göteborgs-Posten,gp.se,SV,privat,qualitaet,False,keine Sitemap gefunden
+Schweden,Sydsvenskan,sydsvenskan.se,SV,privat,qualitaet,True,ok
+Schweden,Omni,omni.se,SV,privat,online,True,ok
+Schweden,SR Ekot,sverigesradio.se,SV,oeffentlich-rechtlich,rundfunk,True,ok
+Belgien,De Morgen,demorgen.be,NL,privat,qualitaet,False,Startseite HTTP 403
+Belgien,Het Nieuwsblad,nieuwsblad.be,NL,privat,boulevard,False,Startseite HTTP 403
+Belgien,L'Avenir,lavenir.net,FR,privat,qualitaet,True,ok
+Belgien,Knack,knack.be,NL,privat,qualitaet,True,ok
+Niederlande,Trouw,trouw.nl,NL,privat,qualitaet,False,Startseite HTTP 403
+Niederlande,Het Parool,parool.nl,NL,privat,qualitaet,False,Startseite HTTP 403
+Niederlande,BNR Nieuwsradio,bnr.nl,NL,privat,rundfunk,False,Startseite HTTP 403
+Niederlande,RTL Nieuws,rtlnieuws.nl,NL,privat,online,False,Startseite HTTP 403
+Bulgarien,Dir.bg,dir.bg,BG,privat,online,True,ok
+Bulgarien,OffNews,offnews.bg,BG,privat,online,True,ok
+Bulgarien,Club Z,clubz.bg,BG,privat,qualitaet,False,keine Sitemap gefunden
+Bulgarien,Nova Novinite,nova.bg,BG,privat,rundfunk,True,ok
+Frankreich,Les Échos,lesechos.fr,FR,privat,qualitaet,False,Startseite HTTP 403
+Frankreich,L'Obs,nouvelobs.com,FR,privat,qualitaet,False,keine Sitemap gefunden
+Frankreich,L'Express,lexpress.fr,FR,privat,qualitaet,True,ok
+Frankreich,Ouest-France,ouest-france.fr,FR,privat,qualitaet,False,Startseite HTTP 403
+Luxemburg,Le Quotidien,lequotidien.lu,FR,privat,qualitaet,True,ok
+Luxemburg,Paperjam,paperjam.lu,FR,privat,qualitaet,True,ok
+Luxemburg,Virgule,virgule.lu,FR,privat,qualitaet,False,Startseite HTTP 403
+Luxemburg,Woxx,woxx.lu,DE,privat,qualitaet,True,ok
+Slowakei,Denník N,dennikn.sk,SK,privat,qualitaet,False,Startseite HTTP 403
+Slowakei,Hospodárske noviny,hnonline.sk,SK,privat,qualitaet,True,ok
+Slowakei,Štandard,standard.sk,SK,privat,qualitaet,True,ok
+Slowakei,Plus jeden deň,pluska.sk,SK,privat,boulevard,True,ok
+Vereinigtes Königreich,Financial Times,ft.com,EN,privat,qualitaet,False,Startseite HTTP 403
+Vereinigtes Königreich,The Times,thetimes.co.uk,EN,privat,qualitaet,False,robots.txt sperrt alles
+Vereinigtes Königreich,Evening Standard,standard.co.uk,EN,privat,qualitaet,True,ok
+Vereinigtes Königreich,Metro,metro.co.uk,EN,privat,boulevard,True,ok
+Malta,Net News,netnews.com.mt,MT,privat,qualitaet,True,ok
+Malta,One News,one.com.mt,MT,privat,qualitaet,False,Startseite HTTP 403
+Malta,The Shift News,theshiftnews.com,EN,privat,qualitaet,True,ok
+Malta,Illum,illum.mt,MT,privat,qualitaet,False,Startseite HTTP 0

@@ -1,0 +1,541 @@
+---
+title: "Masterarbeit – Pilot: Nahost-Berichterstattung von tagesschau.de"
+subtitle: "Vom Scraping über das Korpus zur DTM und ersten Analysen"
+author: "Vincent"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup-knitr, include = FALSE}
+# Grundeinstellungen fürs Knitten:
+# - echo = TRUE   -> Code wird im Dokument angezeigt
+# - message/warning = FALSE -> Paket-Meldungen landen nicht im Bericht
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+# Bausteine aus den Pipeline-Skripten einbinden (tagesschau-Scraper, Quellenmuster)
+knitr::read_chunk("R/11_scraper_tagesschau.R")
+knitr::read_chunk("R/60_quellen.R")
+```
+
+# Worum geht es in diesem Skript?
+
+Das ist der **Pilotlauf** für die Masterarbeit. Ziel ist nicht der fertige Datensatz,
+sondern ein ehrlicher Test der gesamten Pipeline an **einem Medium und einem Monat**:
+
+1. **Artikel finden**: über das Monatsarchiv von tagesschau.de
+2. **Volltexte holen**: die Artikelseiten herunterladen und den Fließtext herauslösen
+3. **Bereinigen**: Duplikate, Videos, irrelevante Treffer und Artikel außerhalb des Zeitraums entfernen
+4. **Korpus und DTM bauen** mit `quanteda`
+5. **Erste Analysen**: Wörterbücher (z. B. „Genozid“, „Selbstverteidigung“), Keywords-in-Context
+6. **Quellenzuschreibungen** auf Satzebene erkennen (IDF, Hamas-Behörden, UN, Agenturen …)
+7. **Vorlage**, um weitere Medien (taz, FAZ, NZZ, …) im gleichen Format anzuhängen
+
+Am Ende weißt du, wie lange das Scraping dauert, wie sauber die Texte sind und ob die
+Analysen grundsätzlich die Fragen beantworten können, die dich interessieren.
+
+> **Wichtig zum Rechtlichen:** Text- und Data-Mining für die wissenschaftliche Forschung ist
+> in Deutschland nach § 60d UrhG grundsätzlich erlaubt. Die Nutzungsbedingungen der
+> tagesschau-API erlauben nicht-kommerzielle Nutzung, aber **keine Veröffentlichung** der
+> Inhalte. Heißt für dich: Paywalls nicht umgehen, das Volltext-Korpus nicht veröffentlichen
+> (höchstens IDs/URLs und abgeleitete Kennzahlen) und höflich scrapen. Kläre die Details
+> zusätzlich mit deiner Betreuung bzw. der Bibliothek ab.
+
+---
+
+# Setup
+
+## Pakete laden
+
+Wir brauchen nur wenige Pakete. Der Block unten installiert fehlende Pakete automatisch
+und lädt dann alle.
+
+| Paket | Wofür? |
+|---|---|
+| `httr2` | HTTP-Anfragen an die API, inklusive Tempolimit und Wiederholungsversuchen |
+| `rvest` / `xml2` | HTML-Seiten auslesen, also den Artikeltext herausziehen |
+| `jsonlite` | API-Antworten (JSON) in R-Objekte umwandeln |
+| `dplyr`, `purrr`, `stringr`, `tibble`, `tidyr`, `readr`, `lubridate` | Datenmanagement („Tidyverse“) |
+| `quanteda`, `quanteda.textstats` | Korpus, Tokenisierung, DTM, Wörterbuch- und Keyness-Analysen |
+
+```{r pakete}
+pakete <- c("httr2", "rvest", "xml2", "jsonlite", "dplyr", "purrr", "stringr",
+            "tibble", "tidyr", "readr", "lubridate", "quanteda", "quanteda.textstats")
+
+fehlend <- pakete[!pakete %in% rownames(installed.packages())]
+if (length(fehlend) > 0) install.packages(fehlend)
+
+invisible(lapply(pakete, library, character.only = TRUE))
+```
+
+## Parameter: alles, was du anpassen willst, steht hier
+
+Alle Stellschrauben stehen an **einem** Ort. So musst du später nicht im Code suchen, wenn du
+z. B. den Zeitraum änderst.
+
+- **`zeitraum_start` / `zeitraum_ende`**: Für den Pilot ein Monat.
+- **`max_seiten`**: Obergrenze für Archivseiten pro Monat (je bis zu 140 Einträge). Schützt
+  vor endlosen Läufen.
+- **`vorfilter`**: Nur Artikel mit Kernbegriff in Titel oder Teaser vollständig herunterladen
+  (spart viele Abrufe, siehe Schritt 1).
+- **`kontakt`**: Wird im *User-Agent* mitgeschickt. So sehen Betreiber, wer anfragt und wie
+  sie dich erreichen. Das ist gute Praxis beim Scraping.
+- **`neu_scrapen`**: Steht das auf `FALSE`, nutzt das Skript nur bereits gespeicherte Daten.
+  Praktisch, wenn du nur die Analyse neu knitten willst.
+
+```{r parameter}
+zeitraum_start <- as.Date("2023-10-07")
+zeitraum_ende  <- as.Date("2023-11-07")
+max_seiten     <- 15          # Archivseiten pro Monat (im Oktober 2023 waren es 4)
+vorfilter      <- TRUE
+kontakt        <- "Masterarbeit (Universitaet XY), Kontakt: deine.mail@uni-xy.de"  # anpassen!
+neu_scrapen    <- TRUE
+
+# Ordnerstruktur: Rohdaten (unveränderte Downloads) getrennt von verarbeiteten Daten.
+# So kannst du jeden Verarbeitungsschritt neu laufen lassen, ohne erneut herunterzuladen.
+dir.create("data/raw/tagesschau_archiv", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/raw/tagesschau_html",   recursive = TRUE, showWarnings = FALSE)
+dir.create("data/processed",             recursive = TRUE, showWarnings = FALSE)
+```
+
+---
+
+# Schritt 1: Artikel finden über das Monatsarchiv
+
+## Warum nicht die Such-API?
+
+Der erste Entwurf hat die Such-API von tagesschau.de benutzt. Der erste Testlauf hat gezeigt:
+Die Suche liefert **nur die letzten rund vier Wochen** (im Test 173 Treffer, alle aus
+September/Oktober 2026). Für historische Zeitfenster wie Oktober 2023 ist sie damit unbrauchbar.
+
+## Das Monatsarchiv
+
+tagesschau.de hat ein **Archiv pro Monat**, das alle Meldungen auflistet, die neuesten zuerst:
+
+```
+https://www.tagesschau.de/archiv?datum=2023-10-01&pageIndex=1
+```
+
+- `datum`: immer der **Erste des Monats** (andere Tage zeigen ebenfalls den ganzen Monat)
+- `pageIndex`: Seite 1, 2, 3 … mit je bis zu 140 Einträgen. Eine leere Seite heißt: Monat zu Ende.
+  Im Oktober 2023 waren es 4 Seiten mit zusammen rund 500 Einträgen.
+
+Jeder Eintrag (CSS-Klasse `teaser-right`) enthält alles, was wir für die Vorauswahl brauchen:
+
+| Feld | Wo im HTML |
+|---|---|
+| Link zum Artikel | `a.teaser-right__link` (Attribut `href`) |
+| Dachzeile | `.teaser-right__labeltopline` |
+| Titel | `.teaser-right__headline` |
+| Kurztext (Teaser) | `.teaser-right__shorttext` |
+| Zeitpunkt | Attribut `data-teaserdate` (Unix-Zeit in Sekunden) |
+
+Wir laden jede Archivseite **einmal**, speichern sie im Cache (`data/raw/tagesschau_archiv/`)
+und warten 3 Sekunden zwischen den Abrufen.
+
+```{r tagesschau-archiv}
+```
+
+## Archiv für den Zeitraum abrufen und vorfiltern
+
+1. Alle Monate bestimmen, die der Zeitraum berührt, und je Monat alle Archivseiten holen.
+2. Auf den genauen Zeitraum filtern.
+3. **Nur Textartikel und Kommentare** behalten, also digitale Zeitungsartikel. Videos, Audios
+   und Liveblogs liegen unter anderen Pfaden (`/multimedia/`, `/newsticker/`) und fallen raus.
+   Liveblogs sind bewusst nicht Teil des Korpus: Die von 2023/2024 hat tagesschau.de nicht mehr
+   online, und bei den anderen Medien gibt es sie über Nexis ohnehin nicht. Kommentare (`/kommentar/`) bleiben drin, weil sie die
+   Meinungsseite des Mediums zeigen; markiere sie in der Analyse über die Spalte `ressort`.
+4. **Vorfilter:** Nur Einträge, bei denen in Dachzeile, Titel oder Kurztext ein Kernbegriff
+   vorkommt, werden später vollständig heruntergeladen. Das spart viele Abrufe. Der Nachteil:
+   Ein Artikel, der das Thema erst weiter unten im Text aufgreift, rutscht durch. Für den Pilot
+   ist das in Ordnung; prüfe es mit `vorfilter <- FALSE` an einem Monat, wenn du wissen willst,
+   wie viel dabei verloren geht.
+
+```{r archiv-ausfuehren, eval = neu_scrapen}
+monate <- seq(floor_date(zeitraum_start, "month"), floor_date(zeitraum_ende, "month"), by = "month")
+
+archiv <- map_dfr(as.character(monate), monat_holen)
+message(nrow(archiv), " Einträge im Archiv für ", length(monate), " Monat(e).")
+
+vorfilter_begriffe <- regex(
+  "israel|gaza|hamas|nahost|westjordanland|pal(ä|ae)stin|idf|netanjahu|geisel",
+  ignore_case = TRUE
+)
+
+treffer <- archiv |>
+  mutate(datum = as.Date(zeit, tz = "Europe/Berlin")) |>
+  filter(datum >= zeitraum_start, datum <= zeitraum_ende) |>
+  filter(str_detect(url, "tagesschau\\.de/(inland|ausland|wirtschaft|investigativ|faktenfinder|wissen|kommentar)/")) |>
+  mutate(
+    id      = str_remove(basename(url), "\\.html$"),
+    ressort = str_match(url, "tagesschau\\.de/([^/]+)/")[, 2],
+    vorfilter_treffer = str_detect(paste(topline, titel, kurztext), vorfilter_begriffe)
+  ) |>
+  distinct(url, .keep_all = TRUE)
+
+# Abbruch mit klarer Meldung, falls etwas grundsätzlich schiefläuft
+if (nrow(treffer) == 0) {
+  stop("Keine Archiv-Einträge im Zeitraum. Datumsspanne im Archiv: ",
+       paste(range(as.Date(archiv$zeit)), collapse = " bis "),
+       ". Prüfe zeitraum_start/zeitraum_ende und ob die Archivseiten geladen wurden.")
+}
+
+message(nrow(treffer), " Textartikel im Zeitraum, davon ", sum(treffer$vorfilter_treffer),
+        " mit Kernbegriff in Titel/Teaser.")
+if (vorfilter) treffer <- filter(treffer, vorfilter_treffer)
+
+write_csv(treffer, "data/processed/tagesschau_treffer_roh.csv")
+```
+
+---
+
+# Schritt 2: Volltexte von den Artikelseiten holen
+
+Das Archiv liefert nur Titel und Teaser. Den **ganzen Text** holen wir von der
+Artikelseite (`url`). Das ist klassisches **Web-Scraping** mit `rvest`:
+
+1. HTML der Seite herunterladen (und im Cache speichern)
+2. Mit einem **CSS-Selektor** die Absätze finden, die zum Fließtext gehören
+3. Den Text daraus extrahieren und zusammenfügen
+
+## Wie findet man den richtigen CSS-Selektor?
+
+Öffne einen Artikel im Browser → Rechtsklick auf einen Absatz → **„Untersuchen“**. Du siehst
+z. B. `<p class="textabsatz">`. Der Selektor dafür ist `p.textabsatz`. Alternativ hilft die
+Browser-Erweiterung **SelectorGadget**.
+
+> **Achtung:** Webseiten ändern ihr HTML gelegentlich. Wenn plötzlich leere Texte
+> herauskommen, ist fast immer der Selektor veraltet. Deshalb gibt es unten eine
+> **Rückfallebene**: Findet der spezifische Selektor nichts, nehmen wir alle `<p>` im
+> `<article>`-Bereich.
+
+Wie beim Archiv warten wir **3 Sekunden** zwischen den Abrufen, um den Server nicht zu
+belasten. Der Selektor `p.textabsatz` funktioniert auch bei Artikeln von 2023 (geprüft).
+
+```{r tagesschau-volltext}
+```
+
+```{r volltext-ausfuehren, eval = neu_scrapen}
+zu_holen <- read_csv("data/processed/tagesschau_treffer_roh.csv", show_col_types = FALSE)
+
+message(nrow(zu_holen), " Artikel werden geholt, geschätzte Dauer: ~",
+        round(nrow(zu_holen) * 3.5 / 60), " Minuten")
+
+zu_holen$html_datei <- map2_chr(zu_holen$id, zu_holen$url, html_holen, .progress = TRUE)
+zu_holen$text       <- map_chr(zu_holen$html_datei, text_extrahieren)
+
+write_csv(zu_holen, "data/processed/tagesschau_artikel_roh.csv")
+```
+
+---
+
+# Schritt 3: Bereinigung
+
+Rohdaten sind nie sauber. Typische Probleme und was wir dagegen tun:
+
+| Problem | Lösung |
+|---|---|
+| Text ist leer (Selektor hat nicht gegriffen, Seite offline) | Artikel mit < 300 Zeichen raus und Anzahl notieren |
+| Artikel ist nur am Rande Nahost (z. B. Innenpolitik mit einem Nebensatz zu Israel) | **Relevanzfilter**: Kernbegriffe müssen mindestens 2-mal vorkommen |
+| Liveblogs / Ticker | gehören nicht ins Korpus; schon in Schritt 1 über den Pfad ausgeschlossen, die Spalte `liveblog` ist nur ein Sicherheitsnetz |
+| Einheitliches Format für mehrere Medien | feste Spalten: `medium, id, url, datum, titel, text` |
+
+Den Relevanzfilter solltest du später **validieren**: 50 rausgefilterte und 50 behaltene
+Artikel lesen und prüfen, ob die Entscheidung stimmt. Das gehört dann auch in die Arbeit.
+
+```{r bereinigung}
+kernbegriffe <- regex(
+  "israel|gaza|hamas|nahost|westjordanland|pal(ä|ae)stin|idf|hisbollah|netanjahu",
+  ignore_case = TRUE
+)
+
+artikel <- read_csv("data/processed/tagesschau_artikel_roh.csv", show_col_types = FALSE) |>
+  mutate(
+    medium        = "tagesschau",
+    text          = coalesce(text, ""),
+    n_zeichen     = nchar(text),
+    n_kernbegriff = str_count(paste(titel, text), kernbegriffe),
+    liveblog      = str_detect(paste(titel, url), regex("liveblog|ticker", ignore_case = TRUE))
+  )
+
+# Transparenz: Wie viele Artikel fallen an welcher Stelle raus?
+tibble(
+  schritt = c("Treffer im Zeitraum (Stories)", "davon mit Text >= 300 Zeichen",
+              "davon relevant (>= 2 Kernbegriffe)"),
+  n = c(nrow(artikel),
+        sum(artikel$n_zeichen >= 300),
+        sum(artikel$n_zeichen >= 300 & artikel$n_kernbegriff >= 2))
+)
+
+artikel <- artikel |>
+  filter(n_zeichen >= 300, n_kernbegriff >= 2) |>
+  select(medium, id, url, datum, titel, topline, ressort, liveblog, text)
+
+if (nrow(artikel) == 0) {
+  stop("Nach der Bereinigung ist kein Artikel übrig. Häufigste Ursache: Der Text-Selektor ",
+       "greift nicht mehr (alle Texte < 300 Zeichen). Prüfe eine Datei in data/raw/tagesschau_html/.")
+}
+
+write_csv(artikel, "data/processed/korpus_tagesschau.csv")
+```
+
+---
+
+# Schritt 4: Korpus und Document-Term-Matrix (DTM)
+
+## Was passiert hier?
+
+Ein Computer kann Texte nicht „lesen“. Wir übersetzen sie deshalb in Zahlen:
+
+1. **Korpus**: Texte plus Metadaten (Medium, Datum, …) in einem Objekt
+2. **Tokens**: Texte in einzelne Wörter zerlegen
+3. **Bereinigen**: Satzzeichen, Zahlen, URLs und **Stoppwörter** („der“, „und“, „ist“) entfernen,
+   alles kleinschreiben
+4. **DTM** (bei `quanteda`: *dfm*): Eine Matrix mit **einer Zeile pro Artikel** und
+   **einer Spalte pro Wort**. Die Zellen zählen, wie oft das Wort im Artikel vorkommt.
+
+Diese Matrix ist **dünn besetzt** (*sparse*): Die allermeisten Zellen sind 0, weil jeder
+Artikel nur einen kleinen Teil des Gesamtvokabulars nutzt. `quanteda` speichert nur die
+Nicht-Null-Werte, sonst würde der Arbeitsspeicher schnell volllaufen.
+
+**Mehrwortausdrücke** wie „israelische Armee“ oder „Vereinte Nationen“ würden beim Zerlegen
+auseinanderfallen. Mit `tokens_compound()` fassen wir sie zu einem Token zusammen
+(`israelische_armee`).
+
+```{r korpus-dtm}
+korp <- corpus(artikel, docid_field = "id", text_field = "text")
+# Die Artikel-ID zusätzlich als Metadatum speichern: Wir brauchen sie später,
+# wenn wir die Texte in Sätze zerlegen (Schritt 6).
+docvars(korp, "artikel_id") <- docnames(korp)
+summary(korp, n = 5)
+
+mehrwort <- phrase(c("israelische armee", "israelische streitkräfte", "vereinte nationen",
+                     "rotes kreuz", "human rights watch", "amnesty international",
+                     "internationaler gerichtshof", "zwei-staaten-lösung"))
+
+toks <- tokens(korp,
+               remove_punct   = TRUE,
+               remove_numbers = TRUE,
+               remove_url     = TRUE,
+               remove_symbols = TRUE) |>
+  tokens_tolower() |>
+  tokens_compound(mehrwort) |>
+  tokens_remove(c(stopwords("de"), "sagte", "sei", "seien", "worden", "dass", "mehr",
+                  "tagesschau", "uhr"))
+
+dtm_voll <- dfm(toks)
+
+# Sehr seltene Wörter (in < 5 Artikeln) entfernen: Sie tragen kaum Information,
+# blähen die Matrix aber stark auf. Die ungetrimmte Version (dtm_voll) behalten wir
+# für die Wörterbücher, denn ein seltenes Wort wie "Völkermord" soll nicht
+# herausfallen, nur weil es in weniger als 5 Artikeln vorkommt.
+dtm <- dfm_trim(dtm_voll, min_docfreq = 5)
+
+dtm   # zeigt Dimensionen (Artikel x Wörter) und den Anteil an Nullen ("sparse")
+```
+
+```{r top-woerter}
+# Die häufigsten Wörter: erster Plausibilitätscheck, ob das Korpus "nach Nahost aussieht"
+textstat_frequency(dtm, n = 30)
+```
+
+---
+
+# Schritt 5: Erste inhaltliche Analysen
+
+## 5.1 Wörterbuch-Ansatz: Wie oft fallen bestimmte Begriffe?
+
+Ein **Wörterbuch** fasst mehrere Wörter zu einer Kategorie zusammen. Das `*` am Ende ist ein
+Platzhalter (`genozid*` findet „genozid“, „genozids“, „genozidal“ …).
+
+> **Wichtig für die Interpretation:** Dass „Genozid“ in einem Artikel vorkommt, heißt **nicht**,
+> dass das Medium den Begriff selbst verwendet. Es kann ein Zitat sein („Südafrika wirft Israel
+> Genozid vor“) oder eine Zurückweisung. Wörterbuch-Zählungen sind deshalb nur ein **erster
+> Indikator**. Was dahintersteht, klären KWIC (5.2) und die Satzanalyse (Schritt 6).
+
+```{r woerterbuch}
+diskurs_dict <- dictionary(list(
+  genozid            = c("genozid*", "völkermord*", "voelkermord*"),
+  terror             = c("terror*"),
+  selbstverteidigung = c("selbstverteidigung*"),
+  humanitaer         = c("humanitär*", "hunger*", "hilfslieferung*", "zivilist*"),
+  kriegsverbrechen   = c("kriegsverbrechen*", "völkerrecht*", "voelkerrecht*"),
+  antisemitismus     = c("antisemit*")
+))
+
+dict_dfm <- dfm_lookup(dtm_voll, diskurs_dict)
+
+# Anteil der Artikel pro Woche, in denen die Kategorie mindestens einmal vorkommt
+dict_woche <- convert(dict_dfm, to = "data.frame") |>
+  as_tibble() |>
+  mutate(woche = floor_date(docvars(dict_dfm, "datum"), "week", week_start = 1)) |>
+  group_by(woche) |>
+  summarise(n_artikel = n(),
+            across(all_of(names(diskurs_dict)), ~ mean(.x > 0)))
+
+dict_woche
+```
+
+## 5.2 Keywords in Context (KWIC): Wie wird ein Begriff verwendet?
+
+KWIC zeigt jede Fundstelle mit den Wörtern davor und danach. Das ist der wichtigste
+Schritt, um von „kommt vor“ zu „**wer** sagt **was**“ zu kommen. Wir arbeiten dafür auf den
+unbereinigten Tokens, damit der Kontext lesbar bleibt.
+
+```{r kwic}
+toks_lesbar <- tokens(korp)
+kwic(toks_lesbar, pattern = c("genozid*", "völkermord*"), window = 12) |> head(20)
+```
+
+---
+
+# Schritt 6: Quellenzuschreibung auf Satzebene
+
+## Die Idee
+
+Eine Kernfrage deiner Arbeit: **Wem wird eine Information zugeschrieben**, und wird die
+Information als **unüberprüft** gekennzeichnet? In Nachrichtentexten erkennt man das an
+typischen Mustern:
+
+- „**nach Angaben der** israelischen Armee …“
+- „**laut** dem von der Hamas kontrollierten Gesundheitsministerium …“
+- „… **teilte** die UN **mit**“, „… **zufolge**“, „**wie** die IDF **erklärte**“
+
+Und an **Verifikationshinweisen**:
+
+- „Die Angaben **lassen sich nicht unabhängig überprüfen**.“
+- „**unabhängig bestätigt**“, „**nicht verifiziert**“
+
+Das kann eine DTM nicht abbilden, weil sie nur zählt, ob Wörter **irgendwo im Artikel**
+stehen. Wir zerlegen die Texte deshalb in **Sätze** und prüfen pro Satz:
+
+1. Enthält er ein **Zuschreibungsmuster**?
+2. Welcher **Akteur** wird genannt?
+3. Gibt es einen **Verifikationshinweis** (im selben Satz oder im Artikel)?
+
+> Das ist eine **regelbasierte erste Annäherung**. Für die Arbeit solltest du sie an einer
+> **handcodierten Stichprobe** (z. B. 300 Sätze, idealerweise mit einer zweiten Codiererin)
+> validieren und Precision/Recall berichten. Später lässt sich das mit NER (`spacyr`) oder
+> einer LLM-gestützten Annotation verfeinern, die dann gegen dieselbe Stichprobe geprüft wird.
+
+```{r quellen-muster-de}
+```
+
+```{r funktion-saetze-markieren-de}
+```
+
+```{r quellen-saetze}
+# Texte in Sätze zerlegen. corpus_reshape() behält die Metadaten bei.
+saetze <- corpus_reshape(korp, to = "sentences")
+
+satz_tab <- tibble(
+  artikel_id = docvars(saetze, "artikel_id"),
+  datum      = docvars(saetze, "datum"),
+  satz       = as.character(saetze)
+) |>
+  saetze_markieren_de()   # Zuschreibung, Verifikation, Akteure, Gesundheitsministerium (R/60_quellen.R)
+
+# Ergebnis: Wie oft wird welchem Akteur etwas zugeschrieben,
+# und wie oft steht dabei ein Verifikationshinweis im selben Satz?
+satz_tab |>
+  filter(zuschreibung) |>
+  summarise(across(all_of(names(akteure_de)),
+                   list(n = ~ sum(.x),
+                        mit_verifikation = ~ sum(.x & verifikation)))) |>
+  tidyr::pivot_longer(everything(),
+                      names_to = c("akteur", ".value"),
+                      names_pattern = "(.*)_(n|mit_verifikation)$")
+```
+
+```{r quellen-beispiele}
+# Zur Kontrolle: zufällige Beispielsätze mit Zuschreibung an das israelische Militär.
+# Lies sie! So merkst du schnell, wo die Muster zu grob oder zu eng sind.
+set.seed(42)
+satz_tab |>
+  filter(zuschreibung, israel_militaer) |>
+  slice_sample(n = 10) |>
+  pull(satz)
+```
+
+---
+
+# Schritt 7: Vorlage für weitere Medien
+
+Jedes weitere Medium braucht nur zwei Dinge:
+
+1. **Eine Liste von Artikel-URLs** im Zeitraum, je nach Seite über Suchseite, Archiv,
+   Sitemap (`/sitemap.xml`, oft nach Datum gegliedert) oder RSS-Feed. Prüfe vorher immer
+   `https://<seite>/robots.txt`, ob das jeweilige Verzeichnis gesperrt ist.
+2. **Den CSS-Selektor** für den Fließtext (siehe Schritt 2).
+
+Wichtig ist, dass am Ende **dieselben Spalten** herauskommen wie bei der tagesschau. Dann
+kannst du alle Medien einfach mit `bind_rows()` zusammenfügen und die Analysen oben ohne
+Änderung laufen lassen. `medium` wird dabei zur zentralen Vergleichsvariable.
+
+> **Bei Paywall-Medien (FAZ, NZZ, Spiegel, Welt …):** nicht scrapen, sondern über die
+> Bibliothek gehen (Nexis Uni, Factiva, FAZ-Archiv). Die Exporte liest du dann ebenfalls in
+> dieses Format ein.
+
+```{r vorlage-medium, eval = FALSE}
+# VORLAGE – vor Gebrauch Selektoren im Browser prüfen und anpassen!
+medium_scrapen <- function(urls, medium_name, selektor_text, selektor_titel = "h1",
+                           selektor_datum = "time", pause = 3) {
+  dir.create(file.path("data/raw", medium_name), showWarnings = FALSE)
+
+  map_dfr(urls, function(u) {
+    datei <- file.path("data/raw", medium_name, paste0(rlang::hash(u), ".html"))
+    if (!file.exists(datei)) {
+      Sys.sleep(pause)
+      resp <- tryCatch(request(u) |> req_user_agent(kontakt) |> req_perform(),
+                       error = function(e) NULL)
+      if (is.null(resp)) return(NULL)
+      writeLines(resp_body_string(resp), datei, useBytes = TRUE)
+    }
+    s <- read_html(datei, encoding = "UTF-8")
+    tibble(
+      medium = medium_name,
+      id     = rlang::hash(u),
+      url    = u,
+      datum  = as.Date(ymd_hms(html_attr(html_element(s, selektor_datum), "datetime"),
+                               quiet = TRUE)),
+      titel  = html_text2(html_element(s, selektor_titel)),
+      text   = paste(html_text2(html_elements(s, selektor_text)), collapse = "\n\n")
+    )
+  })
+}
+
+# Beispielaufruf (Selektor ist ein Platzhalter!):
+# taz <- medium_scrapen(taz_urls, "taz", selektor_text = "article p")
+# korpus_gesamt <- bind_rows(artikel, taz)
+```
+
+---
+
+# Speichern und Reproduzierbarkeit
+
+`sessionInfo()` dokumentiert R- und Paketversionen. Das gehört in den Anhang der Arbeit,
+damit die Ergebnisse nachvollziehbar sind.
+
+```{r speichern}
+saveRDS(list(korpus = korp, dtm = dtm, saetze = satz_tab),
+        "data/processed/pilot_tagesschau.rds")
+sessionInfo()
+```
+
+---
+
+# Was der Pilot dir verraten soll (Checkliste)
+
+- [ ] **Dauer:** Wie lange hat Schritt 1 und 2 gedauert? Hochrechnen auf alle Medien und den vollen Zeitraum.
+- [ ] **Vorfilter:** Wie viele Artikel fallen am Vorfilter raus? Einmal mit `vorfilter <- FALSE` vergleichen.
+- [ ] **Textqualität:** 10 zufällige Texte lesen. Fehlen Absätze, ist Werbung oder Navigation mit drin?
+- [ ] **Relevanzfilter:** Stichprobe prüfen (siehe Schritt 3).
+- [ ] **Wörterbücher:** Ergeben die KWIC-Fundstellen Sinn? Fehlen Begriffe?
+- [ ] **Quellenmuster:** Beispielsätze lesen, Fehlklassifikationen notieren und Muster nachschärfen.
+
+**Nächste Schritte danach:** Literaturrecherche (Framing, Quellennutzung im Krisen-/
+Kriegsjournalismus, Text-as-Data-Methoden), Forschungsfragen schärfen und dann das zweite
+Medium (z. B. taz) anbinden.

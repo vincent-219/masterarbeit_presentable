@@ -1,0 +1,542 @@
+---
+title: "Master's Thesis – Pilot: Middle East Coverage on tagesschau.de"
+subtitle: "From Scraping to Corpus, DTM and First Analyses"
+author: "Vincent"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup-knitr, include = FALSE}
+# Global knitting settings:
+# - echo = TRUE   -> code is shown in the document
+# - message/warning = FALSE -> package messages stay out of the report
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+# Load building blocks from the pipeline scripts (tagesschau scraper, source patterns)
+knitr::read_chunk("R/11_scraper_tagesschau.R")
+knitr::read_chunk("R/60_quellen.R")
+```
+
+# What is this script about?
+
+This is the **pilot run** for the master's thesis. The goal is not the final dataset but an
+honest test of the entire pipeline on **one outlet and one month**:
+
+1. **Find articles** via the monthly archive of tagesschau.de
+2. **Fetch full texts**: download the article pages and extract the body text
+3. **Clean**: remove duplicates, videos, irrelevant hits and articles outside the period
+4. **Build the corpus and DTM** with `quanteda`
+5. **First analyses**: dictionaries (e.g. “Genozid” (genocide), “Selbstverteidigung” (self-defence)), keywords in context
+6. **Detect source attributions** at sentence level (IDF, Hamas authorities, UN, news agencies …)
+7. **Template** for adding further outlets (taz, FAZ, NZZ, …) in the same format
+
+By the end, you will know how long scraping takes, how clean the texts are and whether the
+analyses can, in principle, answer the questions you care about.
+
+> **Legal note:** Text and data mining for scientific research is generally permitted in
+> Germany under § 60d UrhG (German Copyright Act). The terms of use of the tagesschau API
+> allow non-commercial use but **no publication** of the content. For you, this means: do not
+> circumvent paywalls, do not publish the full-text corpus (at most IDs/URLs and derived
+> metrics) and scrape politely. Also clarify the details with your supervisor or the library.
+
+---
+
+# Setup
+
+## Load packages
+
+We need only a few packages. The chunk below installs missing packages automatically
+and then loads all of them.
+
+| Package | Purpose |
+|---|---|
+| `httr2` | HTTP requests to the API, including rate limiting and retries |
+| `rvest` / `xml2` | Parse HTML pages, i.e. extract the article text |
+| `jsonlite` | Convert API responses (JSON) into R objects |
+| `dplyr`, `purrr`, `stringr`, `tibble`, `tidyr`, `readr`, `lubridate` | Data management (“tidyverse”) |
+| `quanteda`, `quanteda.textstats` | Corpus, tokenisation, DTM, dictionary and keyness analyses |
+
+```{r pakete}
+pakete <- c("httr2", "rvest", "xml2", "jsonlite", "dplyr", "purrr", "stringr",
+            "tibble", "tidyr", "readr", "lubridate", "quanteda", "quanteda.textstats")
+
+fehlend <- pakete[!pakete %in% rownames(installed.packages())]
+if (length(fehlend) > 0) install.packages(fehlend)
+
+invisible(lapply(pakete, library, character.only = TRUE))
+```
+
+## Parameters: everything you want to adjust is here
+
+All settings live in **one** place, so you do not have to search the code later when you,
+for example, change the period.
+
+- **`zeitraum_start` / `zeitraum_ende`** (period start/end): one month for the pilot.
+- **`max_seiten`** (max pages): upper limit of archive pages per month (up to 140 entries each).
+  Prevents endless runs.
+- **`vorfilter`** (pre-filter): only fully download articles with a key term in the title or
+  teaser (saves many requests, see Step 1).
+- **`kontakt`** (contact): sent in the *user agent*, so site operators can see who is making
+  requests and how to reach you. This is good scraping practice.
+- **`neu_scrapen`** (re-scrape): if set to `FALSE`, the script uses only previously saved data.
+  Useful when you only want to re-knit the analysis.
+
+```{r parameter}
+zeitraum_start <- as.Date("2023-10-07")
+zeitraum_ende  <- as.Date("2023-11-07")
+max_seiten     <- 15          # archive pages per month (October 2023 had 4)
+vorfilter      <- TRUE
+kontakt        <- "Masterarbeit (Universitaet XY), Kontakt: deine.mail@uni-xy.de"  # adjust!
+neu_scrapen    <- TRUE
+
+# Folder structure: raw data (unaltered downloads) kept separate from processed data.
+# This lets you rerun any processing step without downloading again.
+dir.create("data/raw/tagesschau_archiv", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/raw/tagesschau_html",   recursive = TRUE, showWarnings = FALSE)
+dir.create("data/processed",             recursive = TRUE, showWarnings = FALSE)
+```
+
+---
+
+# Step 1: Find articles via the monthly archive
+
+## Why not the search API?
+
+The first draft used the tagesschau.de search API. The first test run showed that the search
+returns **only roughly the last four weeks** (173 hits in the test, all from
+September/October 2026). This makes it useless for historical windows such as October 2023.
+
+## The monthly archive
+
+tagesschau.de has an **archive for each month** that lists all reports, newest first:
+
+```
+https://www.tagesschau.de/archiv?datum=2023-10-01&pageIndex=1
+```
+
+- `datum` (date): always the **first day of the month** (other days also show the whole month)
+- `pageIndex`: page 1, 2, 3 … with up to 140 entries each. An empty page means the month is over.
+  October 2023 had 4 pages with roughly 500 entries in total.
+
+Each entry (CSS class `teaser-right`) contains everything we need for the pre-selection:
+
+| Field | Location in the HTML |
+|---|---|
+| Link to the article | `a.teaser-right__link` (attribute `href`) |
+| Kicker (topline) | `.teaser-right__labeltopline` |
+| Title | `.teaser-right__headline` |
+| Short text (teaser) | `.teaser-right__shorttext` |
+| Timestamp | attribute `data-teaserdate` (Unix time in seconds) |
+
+We load each archive page **once**, cache it (`data/raw/tagesschau_archiv/`)
+and wait 3 seconds between requests.
+
+```{r tagesschau-archiv}
+```
+
+## Retrieve and pre-filter the archive for the period
+
+1. Determine all months the period touches and fetch all archive pages for each month.
+2. Filter to the exact period.
+3. Keep **only text articles and commentaries**, i.e. digital newspaper articles. Videos, audio
+   and live blogs sit under other paths (`/multimedia/`, `/newsticker/`) and are dropped.
+   Live blogs are deliberately excluded from the corpus: tagesschau.de no longer hosts those from
+   2023/2024, and for the other outlets they are not available via Nexis anyway. Commentaries (`/kommentar/`) stay in because they
+   show the outlet's opinion section; flag them in the analysis via the `ressort` (section) column.
+4. **Pre-filter:** only entries with a key term in the kicker, title or short text are
+   downloaded in full later. This saves many requests. The drawback: an article that only
+   takes up the topic further down in the text slips through. This is acceptable for the pilot;
+   check it with `vorfilter <- FALSE` for one month if you want to know how much is lost.
+
+```{r archiv-ausfuehren, eval = neu_scrapen}
+monate <- seq(floor_date(zeitraum_start, "month"), floor_date(zeitraum_ende, "month"), by = "month")
+
+archiv <- map_dfr(as.character(monate), monat_holen)
+message(nrow(archiv), " Einträge im Archiv für ", length(monate), " Monat(e).")
+
+vorfilter_begriffe <- regex(
+  "israel|gaza|hamas|nahost|westjordanland|pal(ä|ae)stin|idf|netanjahu|geisel",
+  ignore_case = TRUE
+)
+
+treffer <- archiv |>
+  mutate(datum = as.Date(zeit, tz = "Europe/Berlin")) |>
+  filter(datum >= zeitraum_start, datum <= zeitraum_ende) |>
+  filter(str_detect(url, "tagesschau\\.de/(inland|ausland|wirtschaft|investigativ|faktenfinder|wissen|kommentar)/")) |>
+  mutate(
+    id      = str_remove(basename(url), "\\.html$"),
+    ressort = str_match(url, "tagesschau\\.de/([^/]+)/")[, 2],
+    vorfilter_treffer = str_detect(paste(topline, titel, kurztext), vorfilter_begriffe)
+  ) |>
+  distinct(url, .keep_all = TRUE)
+
+# Stop with a clear message if something goes fundamentally wrong
+if (nrow(treffer) == 0) {
+  stop("Keine Archiv-Einträge im Zeitraum. Datumsspanne im Archiv: ",
+       paste(range(as.Date(archiv$zeit)), collapse = " bis "),
+       ". Prüfe zeitraum_start/zeitraum_ende und ob die Archivseiten geladen wurden.")
+}
+
+message(nrow(treffer), " Textartikel im Zeitraum, davon ", sum(treffer$vorfilter_treffer),
+        " mit Kernbegriff in Titel/Teaser.")
+if (vorfilter) treffer <- filter(treffer, vorfilter_treffer)
+
+write_csv(treffer, "data/processed/tagesschau_treffer_roh.csv")
+```
+
+---
+
+# Step 2: Fetch full texts from the article pages
+
+The archive provides only titles and teasers. We fetch the **full text** from the
+article page (`url`). This is classic **web scraping** with `rvest`:
+
+1. Download the page HTML (and cache it)
+2. Use a **CSS selector** to find the paragraphs that belong to the body text
+3. Extract and join the text
+
+## How do you find the right CSS selector?
+
+Open an article in your browser → right-click a paragraph → **“Inspect”** (“Untersuchen” in a
+German browser). You will see, for example, `<p class="textabsatz">`. The matching selector is
+`p.textabsatz`. Alternatively, the browser extension **SelectorGadget** helps.
+
+> **Caution:** Websites change their HTML from time to time. If you suddenly get empty
+> texts, the selector is almost always outdated. That is why there is a **fallback**
+> below: if the specific selector finds nothing, we take all `<p>` elements in the
+> `<article>` section.
+
+As with the archive, we wait **3 seconds** between requests so as not to strain the
+server. The selector `p.textabsatz` also works for articles from 2023 (checked).
+
+```{r tagesschau-volltext}
+```
+
+```{r volltext-ausfuehren, eval = neu_scrapen}
+zu_holen <- read_csv("data/processed/tagesschau_treffer_roh.csv", show_col_types = FALSE)
+
+message(nrow(zu_holen), " Artikel werden geholt, geschätzte Dauer: ~",
+        round(nrow(zu_holen) * 3.5 / 60), " Minuten")
+
+zu_holen$html_datei <- map2_chr(zu_holen$id, zu_holen$url, html_holen, .progress = TRUE)
+zu_holen$text       <- map_chr(zu_holen$html_datei, text_extrahieren)
+
+write_csv(zu_holen, "data/processed/tagesschau_artikel_roh.csv")
+```
+
+---
+
+# Step 3: Cleaning
+
+Raw data are never clean. Typical problems and how we address them:
+
+| Problem | Solution |
+|---|---|
+| Text is empty (selector did not match, page offline) | Drop articles with < 300 characters and record the count |
+| Article touches the Middle East only marginally (e.g. domestic politics with one subordinate clause on Israel) | **Relevance filter**: key terms must occur at least twice |
+| Live blogs / tickers | do not belong in the corpus; already excluded via the path in Step 1, the `liveblog` column is only a safety net |
+| Uniform format for multiple outlets | fixed columns: `medium, id, url, datum, titel, text` (outlet, ID, URL, date, title, text) |
+
+You should **validate** the relevance filter later: read 50 filtered-out and 50 retained
+articles and check whether the decision is correct. This also belongs in the thesis.
+
+```{r bereinigung}
+kernbegriffe <- regex(
+  "israel|gaza|hamas|nahost|westjordanland|pal(ä|ae)stin|idf|hisbollah|netanjahu",
+  ignore_case = TRUE
+)
+
+artikel <- read_csv("data/processed/tagesschau_artikel_roh.csv", show_col_types = FALSE) |>
+  mutate(
+    medium        = "tagesschau",
+    text          = coalesce(text, ""),
+    n_zeichen     = nchar(text),
+    n_kernbegriff = str_count(paste(titel, text), kernbegriffe),
+    liveblog      = str_detect(paste(titel, url), regex("liveblog|ticker", ignore_case = TRUE))
+  )
+
+# Transparency: how many articles are dropped at which step?
+tibble(
+  schritt = c("Treffer im Zeitraum (Stories)", "davon mit Text >= 300 Zeichen",
+              "davon relevant (>= 2 Kernbegriffe)"),
+  n = c(nrow(artikel),
+        sum(artikel$n_zeichen >= 300),
+        sum(artikel$n_zeichen >= 300 & artikel$n_kernbegriff >= 2))
+)
+
+artikel <- artikel |>
+  filter(n_zeichen >= 300, n_kernbegriff >= 2) |>
+  select(medium, id, url, datum, titel, topline, ressort, liveblog, text)
+
+if (nrow(artikel) == 0) {
+  stop("Nach der Bereinigung ist kein Artikel übrig. Häufigste Ursache: Der Text-Selektor ",
+       "greift nicht mehr (alle Texte < 300 Zeichen). Prüfe eine Datei in data/raw/tagesschau_html/.")
+}
+
+write_csv(artikel, "data/processed/korpus_tagesschau.csv")
+```
+
+---
+
+# Step 4: Corpus and document-term matrix (DTM)
+
+## What happens here?
+
+A computer cannot “read” texts. We therefore translate them into numbers:
+
+1. **Corpus**: texts plus metadata (outlet, date, …) in one object
+2. **Tokens**: split texts into individual words
+3. **Clean**: remove punctuation, numbers, URLs and **stop words** (“der”, “und”, “ist” – “the”,
+   “and”, “is”), and lowercase everything
+4. **DTM** (in `quanteda`: *dfm*): a matrix with **one row per article** and
+   **one column per word**. The cells count how often the word occurs in the article.
+
+This matrix is **sparse**: the vast majority of cells are 0 because each article uses only
+a small part of the total vocabulary. `quanteda` stores only the non-zero values; otherwise
+memory would fill up quickly.
+
+**Multi-word expressions** such as “israelische Armee” (Israeli army) or “Vereinte Nationen”
+(United Nations) would fall apart during tokenisation. `tokens_compound()` merges them into
+a single token (`israelische_armee`).
+
+```{r korpus-dtm}
+korp <- corpus(artikel, docid_field = "id", text_field = "text")
+# Also store the article ID as metadata: we need it later
+# when we split the texts into sentences (Step 6).
+docvars(korp, "artikel_id") <- docnames(korp)
+summary(korp, n = 5)
+
+mehrwort <- phrase(c("israelische armee", "israelische streitkräfte", "vereinte nationen",
+                     "rotes kreuz", "human rights watch", "amnesty international",
+                     "internationaler gerichtshof", "zwei-staaten-lösung"))
+
+toks <- tokens(korp,
+               remove_punct   = TRUE,
+               remove_numbers = TRUE,
+               remove_url     = TRUE,
+               remove_symbols = TRUE) |>
+  tokens_tolower() |>
+  tokens_compound(mehrwort) |>
+  tokens_remove(c(stopwords("de"), "sagte", "sei", "seien", "worden", "dass", "mehr",
+                  "tagesschau", "uhr"))
+
+dtm_voll <- dfm(toks)
+
+# Remove very rare words (in < 5 articles): they carry little information
+# but inflate the matrix considerably. We keep the untrimmed version (dtm_voll)
+# for the dictionaries, because a rare word such as "Völkermord" should not
+# drop out just because it occurs in fewer than 5 articles.
+dtm <- dfm_trim(dtm_voll, min_docfreq = 5)
+
+dtm   # shows dimensions (articles x words) and the share of zeros ("sparse")
+```
+
+```{r top-woerter}
+# The most frequent words: a first plausibility check of whether the corpus "looks like the Middle East"
+textstat_frequency(dtm, n = 30)
+```
+
+---
+
+# Step 5: First substantive analyses
+
+## 5.1 Dictionary approach: how often do certain terms occur?
+
+A **dictionary** groups several words into one category. The `*` at the end is a
+wildcard (`genozid*` matches “genozid”, “genozids”, “genozidal” …).
+
+> **Important for interpretation:** The occurrence of “Genozid” (genocide) in an article does
+> **not** mean that the outlet uses the term itself. It may be a quote (“Südafrika wirft Israel
+> Genozid vor” (South Africa accuses Israel of genocide)) or a rejection. Dictionary counts are
+> therefore only a **first indicator**. KWIC (5.2) and the sentence analysis (Step 6) clarify
+> what lies behind them.
+
+```{r woerterbuch}
+diskurs_dict <- dictionary(list(
+  genozid            = c("genozid*", "völkermord*", "voelkermord*"),
+  terror             = c("terror*"),
+  selbstverteidigung = c("selbstverteidigung*"),
+  humanitaer         = c("humanitär*", "hunger*", "hilfslieferung*", "zivilist*"),
+  kriegsverbrechen   = c("kriegsverbrechen*", "völkerrecht*", "voelkerrecht*"),
+  antisemitismus     = c("antisemit*")
+))
+
+dict_dfm <- dfm_lookup(dtm_voll, diskurs_dict)
+
+# Share of articles per week in which the category occurs at least once
+dict_woche <- convert(dict_dfm, to = "data.frame") |>
+  as_tibble() |>
+  mutate(woche = floor_date(docvars(dict_dfm, "datum"), "week", week_start = 1)) |>
+  group_by(woche) |>
+  summarise(n_artikel = n(),
+            across(all_of(names(diskurs_dict)), ~ mean(.x > 0)))
+
+dict_woche
+```
+
+## 5.2 Keywords in context (KWIC): how is a term used?
+
+KWIC shows each occurrence with the words before and after it. This is the key step
+for moving from “occurs” to “**who** says **what**”. We work on the uncleaned tokens
+so that the context remains readable.
+
+```{r kwic}
+toks_lesbar <- tokens(korp)
+kwic(toks_lesbar, pattern = c("genozid*", "völkermord*"), window = 12) |> head(20)
+```
+
+---
+
+# Step 6: Source attribution at sentence level
+
+## The idea
+
+A core question of your thesis: **to whom is a piece of information attributed**, and is it
+flagged as **unverified**? In news texts, you can recognise this by typical patterns:
+
+- “**nach Angaben der** israelischen Armee …” (according to the Israeli army)
+- “**laut** dem von der Hamas kontrollierten Gesundheitsministerium …” (according to the
+  Hamas-run health ministry)
+- “… **teilte** die UN **mit**” (the UN announced), “… **zufolge**” (according to),
+  “**wie** die IDF **erklärte**” (as the IDF stated)
+
+And by **verification caveats**:
+
+- “Die Angaben **lassen sich nicht unabhängig überprüfen**.” (The figures cannot be
+  independently verified.)
+- “**unabhängig bestätigt**” (independently confirmed), “**nicht verifiziert**” (not verified)
+
+A DTM cannot capture this because it only counts whether words appear **anywhere in the
+article**. We therefore split the texts into **sentences** and check each sentence:
+
+1. Does it contain an **attribution pattern**?
+2. Which **actor** is named?
+3. Is there a **verification caveat** (in the same sentence or in the article)?
+
+> This is a **rule-based first approximation**. For the thesis, you should validate it against
+> a **hand-coded sample** (e.g. 300 sentences, ideally with a second coder) and report
+> precision/recall. Later, it can be refined with NER (`spacyr`) or LLM-assisted annotation,
+> which is then tested against the same sample.
+
+```{r quellen-muster-de}
+```
+
+```{r funktion-saetze-markieren-de}
+```
+
+```{r quellen-saetze}
+# Split texts into sentences. corpus_reshape() keeps the metadata.
+saetze <- corpus_reshape(korp, to = "sentences")
+
+satz_tab <- tibble(
+  artikel_id = docvars(saetze, "artikel_id"),
+  datum      = docvars(saetze, "datum"),
+  satz       = as.character(saetze)
+) |>
+  saetze_markieren_de()   # attribution, verification, actors, health ministry (R/60_quellen.R)
+
+# Result: how often is something attributed to each actor,
+# and how often does a verification caveat appear in the same sentence?
+satz_tab |>
+  filter(zuschreibung) |>
+  summarise(across(all_of(names(akteure_de)),
+                   list(n = ~ sum(.x),
+                        mit_verifikation = ~ sum(.x & verifikation)))) |>
+  tidyr::pivot_longer(everything(),
+                      names_to = c("akteur", ".value"),
+                      names_pattern = "(.*)_(n|mit_verifikation)$")
+```
+
+```{r quellen-beispiele}
+# As a check: random example sentences with attribution to the Israeli military.
+# Read them! This quickly shows where the patterns are too broad or too narrow.
+set.seed(42)
+satz_tab |>
+  filter(zuschreibung, israel_militaer) |>
+  slice_sample(n = 10) |>
+  pull(satz)
+```
+
+---
+
+# Step 7: Template for further outlets
+
+Each additional outlet needs only two things:
+
+1. **A list of article URLs** for the period, obtained, depending on the site, via a search
+   page, archive, sitemap (`/sitemap.xml`, often organised by date) or RSS feed. Always check
+   `https://<seite>/robots.txt` first to see whether the relevant directory is disallowed.
+2. **The CSS selector** for the body text (see Step 2).
+
+What matters is that you end up with **the same columns** as for tagesschau. You can then
+simply combine all outlets with `bind_rows()` and run the analyses above unchanged. `medium`
+(outlet) becomes the central comparison variable.
+
+> **For paywalled outlets (FAZ, NZZ, Spiegel, Welt …):** do not scrape; go through the
+> library instead (Nexis Uni, Factiva, FAZ archive). You then read those exports into
+> this format as well.
+
+```{r vorlage-medium, eval = FALSE}
+# TEMPLATE – check and adjust the selectors in the browser before use!
+medium_scrapen <- function(urls, medium_name, selektor_text, selektor_titel = "h1",
+                           selektor_datum = "time", pause = 3) {
+  dir.create(file.path("data/raw", medium_name), showWarnings = FALSE)
+
+  map_dfr(urls, function(u) {
+    datei <- file.path("data/raw", medium_name, paste0(rlang::hash(u), ".html"))
+    if (!file.exists(datei)) {
+      Sys.sleep(pause)
+      resp <- tryCatch(request(u) |> req_user_agent(kontakt) |> req_perform(),
+                       error = function(e) NULL)
+      if (is.null(resp)) return(NULL)
+      writeLines(resp_body_string(resp), datei, useBytes = TRUE)
+    }
+    s <- read_html(datei, encoding = "UTF-8")
+    tibble(
+      medium = medium_name,
+      id     = rlang::hash(u),
+      url    = u,
+      datum  = as.Date(ymd_hms(html_attr(html_element(s, selektor_datum), "datetime"),
+                               quiet = TRUE)),
+      titel  = html_text2(html_element(s, selektor_titel)),
+      text   = paste(html_text2(html_elements(s, selektor_text)), collapse = "\n\n")
+    )
+  })
+}
+
+# Example call (the selector is a placeholder!):
+# taz <- medium_scrapen(taz_urls, "taz", selektor_text = "article p")
+# korpus_gesamt <- bind_rows(artikel, taz)
+```
+
+---
+
+# Saving and reproducibility
+
+`sessionInfo()` documents the R and package versions. This belongs in the thesis appendix
+so that the results can be reproduced.
+
+```{r speichern}
+saveRDS(list(korpus = korp, dtm = dtm, saetze = satz_tab),
+        "data/processed/pilot_tagesschau.rds")
+sessionInfo()
+```
+
+---
+
+# What the pilot should tell you (checklist)
+
+- [ ] **Duration:** How long did Steps 1 and 2 take? Extrapolate to all outlets and the full period.
+- [ ] **Pre-filter:** How many articles does the pre-filter drop? Compare once with `vorfilter <- FALSE`.
+- [ ] **Text quality:** Read 10 random texts. Are paragraphs missing, or are ads or navigation included?
+- [ ] **Relevance filter:** Check a sample (see Step 3).
+- [ ] **Dictionaries:** Do the KWIC hits make sense? Are terms missing?
+- [ ] **Source patterns:** Read example sentences, note misclassifications and refine the patterns.
+
+**Next steps afterwards:** literature review (framing, source use in crisis and war
+journalism, text-as-data methods), sharpen the research questions and then add the second
+outlet (e.g. taz).

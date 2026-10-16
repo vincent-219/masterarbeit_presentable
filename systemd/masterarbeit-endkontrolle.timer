@@ -1,0 +1,9 @@
+[Unit]
+Description=Masterarbeit: stündlich prüfen, ob die Endkontrolle fällig ist
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

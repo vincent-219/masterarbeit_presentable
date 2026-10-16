@@ -1,0 +1,19 @@
+[Unit]
+Description=Masterarbeit: nächtlicher Übersetzungslauf (leise)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+# Vor der Installation anpassen: BENUTZER und PROJEKTORDNER (systemd-System-Dienst unter /etc/systemd/system/)
+Type=oneshot
+User=BENUTZER
+WorkingDirectory=PROJEKTORDNER
+Environment=HOME=/home/BENUTZER
+# "+" = als root, "-" = Fehler ignorieren (LEDs sind nicht kritisch)
+ExecStartPre=+/usr/local/bin/nachtlauf-gpu senken 221
+ExecStartPre=-+/usr/bin/openrgb --noautoconnect --device B550M --mode static --color 000000
+# Sperre muss als root laufen (ohne Anmeldesitzung verweigert polkit sie), R selbst läuft als BENUTZER
+ExecStart=+/usr/bin/systemd-inhibit --what=sleep:idle --who=masterarbeit --why=Nachtlauf --mode=block /usr/sbin/runuser -u BENUTZER -- /usr/bin/Rscript run_nightly.R
+ExecStopPost=+/usr/local/bin/nachtlauf-gpu zuruecksetzen
+TimeoutStartSec=infinity
+Nice=5

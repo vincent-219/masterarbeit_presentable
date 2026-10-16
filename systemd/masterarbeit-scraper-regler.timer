@@ -1,0 +1,10 @@
+[Unit]
+Description=Masterarbeit: Scraper-Worker alle 3 Minuten prüfen
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=3min
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target

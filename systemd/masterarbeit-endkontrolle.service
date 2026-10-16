@@ -1,0 +1,10 @@
+[Unit]
+Description=Masterarbeit: Endkontrolle, sobald Abruf und Übersetzung fertig sind (skripte/endkontrolle.py)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Projekte/Masterarbeit_Nahost_Presentable
+ExecStart=/usr/bin/python3 skripte/endkontrolle.py
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=6h

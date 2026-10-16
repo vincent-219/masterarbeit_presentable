@@ -1,0 +1,14 @@
+[Unit]
+Description=Masterarbeit: Live-Server fürs Dashboard (http://127.0.0.1:8765/dashboard.html, Echtzeit-Stand per /live.json)
+
+[Service]
+WorkingDirectory=%h/Projekte/Masterarbeit_Nahost_Presentable
+ExecStart=/usr/bin/python3 skripte/live_server.py
+Restart=always
+RestartSec=5
+Nice=10
+MemoryMax=300M
+# Nur lesend (Dateien, Prozessliste, Datenbank mode=ro); bindet nur an 127.0.0.1.
+
+[Install]
+WantedBy=default.target
