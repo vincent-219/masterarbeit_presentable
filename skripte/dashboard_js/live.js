@@ -79,7 +79,7 @@
     const s = d.dienste, a = d.abruf || {}, db = d.db || {}, st = d.status || {}, pl = d.platte || {};
     if (!start && db.artikel != null) start = {artikel: db.artikel, ue: (db.uebersetzt || {}).nllb_halbseite, csv: (d.status || {}).artikel_summe, t: d.zeit_unix};
     const ue = (db.uebersetzt || {});
-    const tempo = a.seiten_5min != null ? a.seiten_5min / 5 : null;
+    const tempo = a.seiten_15min != null ? a.seiten_15min / 15 : null;   // 15-Minuten-Fenster glättet die Lade- und Lesephasen (vorher 5 min)
     const ab = d.abdeckung || {}, as = ab.summe || {};
     const mc = d.mediacloud || {}, sl = d.scraper_log || {}, ul = d.uebersetzer_log || {}, v0 = d.verlauf || [];
     const alter = z => z ? Math.max(0, d.zeit_unix - new Date(String(z).replace(' ', 'T')).getTime() / 1000) : null;
@@ -154,12 +154,21 @@
       `<p>Rating half-page translations: <b>${zahl(ql.bewertet)}</b> of about ${zahl(ql.gesamt)} done (${(100 * ql.bewertet / ql.gesamt).toFixed(0)} %).</p>` +
       `<progress max="100" value="${(100 * ql.bewertet / ql.gesamt).toFixed(1)}" style="width:100%"></progress>` +
       '<p class="klein">The result (flagged share by language) appears in the section "Translation quality classifier" below after the next page build.</p>') : '';
+    const hp = d.hpc || {}, nh = Object.entries(ue || {}).filter(([k]) => k.startsWith('nllb_hpc_'));
+    const hpcStufe = (hp.zeit || nh.length) ? stufe('8 · Cluster (bwUniCluster)', hp.verbindung ? ((hp.jobs || []).some(j => j.zustand === 'RUNNING') ? 'an' : 'aus') : 'warn',
+      hp.verbindung ? ((hp.jobs || []).length ? (hp.jobs.length + ' job(s)') : 'connected, no jobs') : 'no connection',
+      (hp.verbindung ? '' : '<p class="klein">No open SSH connection to the cluster: start <code>cluster-login</code> (the status below is the last known one).</p>') +
+      ((hp.jobs || []).length ? '<table><tr><th>Job</th><th>Name</th><th>State</th><th>Run time</th><th>Queue / reason</th></tr>' +
+        hp.jobs.map(j => `<tr><td>${esc(j.id)}</td><td>${esc(j.name)}</td><td>${esc(j.zustand)}</td><td>${esc(j.laufzeit)}</td><td>${esc(j.warteschlange)} ${esc(j.grund)}</td></tr>`).join('') + '</table>'
+        : '<p>No Slurm jobs queued or running.</p>') +
+      (nh.length ? '<p>Translations imported from the cluster (engine nllb_hpc): ' + nh.map(([k, v]) => `<b>${zahl(v)}</b> ${esc(k.replace('nllb_hpc_', ''))}`).join(', ') + '.</p>' : '') +
+      (hp.stand_jobs ? `<p class="klein">Job status ${vor(Math.round(d.zeit_unix - hp.stand_jobs))} · checked every 2 minutes through the open SSH connection (it stays open up to 12 hours; a new one needs your one-time code).</p>` : '')) : '';
     const tun = '<div class="live-tun"><h3>What is happening right now</h3>' +
       stufe('1 · Scraper', scrZust, scrMarke, scrInhalt) +
       stufe('2 · Import into the database', impAktiv ? 'an' : 'warn', impAktiv ? 'running' : 'stopped', impInhalt) +
       stufe('3 · Translation (NLLB)', !s.uebersetzung.aktiv ? 'warn' : (offenUe > 0 ? 'an' : 'aus'), !s.uebersetzung.aktiv ? 'stopped' : (offenUe > 0 ? 'translating' : 'idle'), ueInhalt) +
       stufe('4 · Dashboard build', s.dashboard_bau.aktiv ? 'an' : 'aus', s.dashboard_bau.aktiv ? 'rebuilding' : 'up to date', bauInhalt) +
-      stufe('5 · Statistical analyses', s.methoden.aktiv ? 'warn' : 'aus', s.methoden.aktiv ? 'running' : 'deferred', methInhalt) + nexisStufe + qualStufe + '</div>';
+      stufe('5 · Statistical analyses', s.methoden.aktiv ? 'warn' : 'aus', s.methoden.aktiv ? 'running' : 'deferred', methInhalt) + nexisStufe + qualStufe + hpcStufe + '</div>';
     const warn = [];
     if (nx.vpn && s.scraper.aktiv) warn.push('The Uni VPN is active while the scraper is running: the scraper\'s requests leave with the university address. Stop one of them.');
     if (!s.scraper.aktiv) warn.push(nx.vpn ? 'The scraper is stopped on purpose while the Uni VPN is active (the VPN routes all traffic, so its requests would leave with the university address). After the Nexis export: Uni VPN off, then <code>systemctl --user start masterarbeit-scraper</code>.' : 'The scraper is not running. Start it with: <code>systemctl --user start masterarbeit-scraper</code>');
